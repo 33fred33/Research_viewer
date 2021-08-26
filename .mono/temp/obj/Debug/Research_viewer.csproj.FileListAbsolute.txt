@@ -1,0 +1,8 @@
+C:\Users\fredx\Documents\Gits\Research_viewer\.mono\temp\obj\Debug\Research_viewer.csprojAssemblyReference.cache
+C:\Users\fredx\Documents\Gits\Research_viewer\.mono\temp\obj\Debug\Research_viewer.csproj.CoreCompileInputs.cache
+C:\Users\fredx\Documents\Gits\Research_viewer\.mono\temp\obj\Debug\Research_viewer.AssemblyInfoInputs.cache
+C:\Users\fredx\Documents\Gits\Research_viewer\.mono\temp\obj\Debug\Research_viewer.AssemblyInfo.cs
+C:\Users\fredx\Documents\Gits\Research_viewer\.mono\temp\bin\Debug\Research_viewer.dll
+C:\Users\fredx\Documents\Gits\Research_viewer\.mono\temp\bin\Debug\Research_viewer.pdb
+C:\Users\fredx\Documents\Gits\Research_viewer\.mono\temp\obj\Debug\Research_viewer.dll
+C:\Users\fredx\Documents\Gits\Research_viewer\.mono\temp\obj\Debug\Research_viewer.pdb
