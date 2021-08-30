@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://mnk_tileset.tres" type="TileSet" id=1]
+[ext_resource path="res://Main_control.cs" type="Script" id=2]
+
+[node name="Main_control" type="Control"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 578.0
+margin_bottom = 578.0
+script = ExtResource( 2 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+mnk_tileset = ExtResource( 1 )

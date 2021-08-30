@@ -4,50 +4,83 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
 
-public class mnk_game : Control
-{
-	// Declare member variables here. Examples:
-	public List<mnk_game_state> game_states;
 
-	// Called when the node enters the scene tree for the first time.
+public class Main_control : Control
+{
+
+	//mnk game variables
+	[Export]
+	public Godot.TileSet mnk_tileset;
+	Godot.PackedScene mnk_game_viewer;
+	public List<mnk_state> mnk_game_states = new List<mnk_state>();
+
+
+	public Random rand = new Random();
+
 	public override void _Ready()
 	{
-		Stopwatch timer = new Stopwatch();
-		var base_state = new mnk_game_state();
+		mnk_game_viewer = (PackedScene)GD.Load("res://mnk_game_view.tscn");
+		var base_state = new mnk_state();
 		base_state.set_initial_state(13,13,5);
-		Random rand = new Random();
-		int [] winner_count = {0,0,0};
+		mnk_game_states.Add(base_state);
+		mnk_game_states[0].set_initial_state(13,13,5);
+	}
 
-		timer.Start();
-		//for (int i = 0; i < 1000; i++)
-		while (timer.Elapsed.TotalSeconds<10)
+	public override void _Process(float delta)
+	{
+		if (Input.IsKeyPressed((int)KeyList.N))
 		{
-			var ds = base_state.duplicate();
-			while (!ds.terminal)
-				{
-					ds.make_action(rand.Next(0,ds.available_actions.Count-1));
-				}
-			//ds.view_state();
-			winner_count[ds.winner]++;
-			//GD.Print("Winner", ds.winner, " in", ds.ply, " plies");
-		}
-		timer.Stop();
-		GD.Print(timer.Elapsed.TotalSeconds);
-		GD.Print(winner_count.Sum());
-		base_state.print_array(winner_count);
+			GD.Print("Pressed N");
+			var final_state = mnk_game_states[0].random_game(rand);
+			view_mnk_state(final_state);
+			//mnk_game.full_random_games();
+			//this.EmitSignal("Test_game");
+			//Godot.Control mnk_game = this.GetNode<Godot.Control>("mnk_game");
 
+		}
+	}
+
+	public void view_mnk_state(mnk_state state)
+	{
+		state.view_state();
+		PanelContainer mnk_game_view = (PanelContainer)mnk_game_viewer.Instance();
+		mnk_game_view.SetPosition(this.RectPosition);
+		this.AddChild(mnk_game_view);
 	}
 
 	
 
-//  // Called every frame. 'delta' is the elapsed time since the previous frame.
-//  public override void _Process(float delta)
-//  {
-//      
-//  }
 }
 
-public class mnk_game_state
+
+
+
+
+// ------------------------MCTS---------------------------------
+public class MCTS_node
+{
+	public MCTS_node parent;
+	public List<MCTS_node> children = new List<MCTS_node>();
+	public int visits;
+	public float reward;
+	public int state_index;
+
+}
+
+public class MCTS
+{
+
+
+	
+}
+
+
+
+
+
+
+// -----------------------MNK GAME-----------------------------------
+public class mnk_state
 {
 	public int m, n, k, player_turn, ply, winner;
 	public int [][] board;
@@ -58,7 +91,7 @@ public class mnk_game_state
 	private List<int> inv_diag = new List<int>();
 	private int offset;
 
-	//public mnk_game_state(int m, int n, int k, int player_turn, int ply, int winner, int[][] board, List<mnk_action>, bool terminal)
+	//public mnk_state(int m, int n, int k, int player_turn, int ply, int winner, int[][] board, List<mnk_action>, bool terminal)
 	//{
 		
 	//}
@@ -176,10 +209,25 @@ public class mnk_game_state
 			}
 			GD.Print(Convert.ToString(string_row));
 		}
-		
 	}
 
-	public mnk_game_state duplicate()
+	public mnk_state random_game(Random rand)
+	{
+		var ds = this.duplicate();
+		while (!ds.terminal)
+			{
+				ds.make_action(rand.Next(0,ds.available_actions.Count-1));
+			}
+		//GD.Print("Winner", ds.winner, " in", ds.ply, " plies");
+		//this.EmitSignal("mnk_game_finished", ds.board);
+		//PanelContainer mnk_game_view = (PanelContainer)mnk_game_viewer.Instance();
+		//mnk_game_view.SetPosition(game_controller.RectPosition);
+		//game_controller.AddChild(mnk_game_view);
+		return ds;
+	}
+		
+
+	public mnk_state duplicate()
 	{
 		int[][] duplicate_board = new int[board.Length][];
 		for (int i = 0; i < board.Length; i++)
@@ -192,12 +240,12 @@ public class mnk_game_state
 			duplicate_actions.Add(action.duplicate());
 		}
 
-		mnk_game_state the_duplicate = new mnk_game_state
+		mnk_state the_duplicate = new mnk_state
 		{
 			m = m,
 			n = n, 
 			k = k, 
-			player_turn = this.player_turn, 
+			player_turn = player_turn, 
 			ply = ply, 
 			winner = winner,
 			board = duplicate_board,
