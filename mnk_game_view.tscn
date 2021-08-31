@@ -2,14 +2,14 @@
 
 [ext_resource path="res://mnk_tileset.tres" type="TileSet" id=1]
 
-[node name="PanelContainer" type="PanelContainer"]
+[node name="GameView" type="PanelContainer"]
 margin_right = 585.0
 margin_bottom = 585.0
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="TileMap" type="TileMap" parent="."]
+[node name="Board" type="TileMap" parent="."]
 tile_set = ExtResource( 1 )
 cell_size = Vector2( 45, 45 )
 cell_custom_transform = Transform2D( 0, 0, 0, 0, 0, 0 )

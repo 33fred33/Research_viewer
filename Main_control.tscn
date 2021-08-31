@@ -4,12 +4,43 @@
 [ext_resource path="res://Main_control.cs" type="Script" id=2]
 
 [node name="Main_control" type="Control"]
-margin_left = 7.0
-margin_top = 7.0
-margin_right = 578.0
-margin_bottom = 578.0
+margin_left = 0.32579
+margin_top = -1.00903
+margin_right = 571.326
+margin_bottom = 569.991
 script = ExtResource( 2 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
 mnk_tileset = ExtResource( 1 )
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+margin_left = 38.7103
+margin_top = 118.801
+margin_right = 559.71
+margin_bottom = 492.801
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="ScrollContainer"]
+margin_right = 24.0
+margin_bottom = 24.0
+
+[node name="CheckBox" type="CheckBox" parent="ScrollContainer/HBoxContainer"]
+margin_right = 24.0
+margin_bottom = 24.0
+
+[node name="ItemList" type="ItemList" parent="."]
+margin_left = 216.244
+margin_top = 40.0452
+margin_right = 907.244
+margin_bottom = 583.045
+
+[node name="PopupPanel" type="PopupPanel" parent="."]
+visible = true
+margin_right = 8.0
+margin_bottom = 8.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
