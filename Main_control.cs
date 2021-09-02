@@ -15,17 +15,22 @@ public class Main_control : Control
 	Godot.VBoxContainer instance_game_viewer;
 	Godot.Label node_data;
 	public List<mnk_state> mnk_game_states = new List<mnk_state>();
+
+	//MCTS variables
 	public MCTS mcts;
-	public bool M_lock = false;
-	public bool N_lock = false;
 	public MCTS_node selected_node;
 	public MCTS_node expanded_node;
 	public double temporal_reward = 0;
-
 	public Godot.Label reward_label;
 	public GridContainer MCTS_menu;
+	public Godot.Button selection_button, simulation_button, expansion_button, backpropagation_button, iterate_button, see_suggested_button;
+	public Godot.HSlider N_iterations;
 
+	//Godot items
 
+	//Class variables
+	public bool M_lock = false;
+	public bool N_lock = false;
 	public Random rand = new Random();
 
 	public override void _Ready()
@@ -36,12 +41,18 @@ public class Main_control : Control
 		this.AddChild(instance_game_viewer);
 		node_data = instance_game_viewer.GetNode<Label>("Node_data");
 		var base_state = new mnk_state();
-		base_state.set_initial_state(13, 13, 5);
+		base_state.set_initial_state(3, 3, 3);
 		mnk_game_states.Add(base_state);
-		mnk_game_states[0].set_initial_state(13, 13, 5);
 		mcts = new MCTS(base_state);
 		MCTS_menu = GetNode<GridContainer>("MCTS_menu");
 		reward_label = MCTS_menu.GetNode<Label>("Reward");
+		selection_button = MCTS_menu.GetNode<Button>("Selection");
+		expansion_button = MCTS_menu.GetNode<Button>("Expansion");
+		simulation_button = MCTS_menu.GetNode<Button>("Simulation");
+		selection_button = MCTS_menu.GetNode<Button>("Backpropagation");
+		selection_button = MCTS_menu.GetNode<Button>("Iterate");
+		N_iterations = MCTS_menu.GetNode<HSlider>("N_iterations");
+		see_suggested_button = MCTS_menu.GetNode<Button>("See_suggested");
 	}
 
 	public override void _Process(float delta)
@@ -55,6 +66,7 @@ public class Main_control : Control
 				GD.Print("Pressed N");
 				var final_state = mnk_game_states[0].random_game(rand);
 				view_mnk_state(final_state);
+				node_data.Text = "winner: " + Convert.ToString(final_state.winner);
 				//mnk_game.full_random_games();
 				//this.EmitSignal("Test_game");
 			//Godot.Control mnk_game = this.GetNode<Godot.Control>("mnk_game");
@@ -87,7 +99,7 @@ public class Main_control : Control
 
 	public void view_mnk_state(mnk_state state)
 	{
-		state.view_state();
+		//state.view_state();
 		//instance_game_viewer.QueueFree();
 		TileMap mnk_tilemap = (TileMap)instance_game_viewer.GetNode<TileMap>("Board");
 
@@ -113,7 +125,7 @@ public class Main_control : Control
 	public void mcts_view_root_node()
 	{
 		view_mnk_state(mcts.root_node.state);
-		reward_label.Text = (mcts.root_node._str());
+		node_data.Text = (mcts.root_node._str());
 	}
 
 	public void mcts_selection()
@@ -148,6 +160,26 @@ public class Main_control : Control
 	public void mcts_backpropagation()
 	{
 		mcts.backpropagate(expanded_node, temporal_reward);
+	}
+
+	public void mcts_iterate()
+	{
+		//mcts.iteration((int)N_iterations.Value);
+		for (int i = 0; i < N_iterations.Value; i++)
+		{
+		mcts_selection();
+		//view_selected_node();
+		mcts_expansion();
+		//view_expanded_node();
+		mcts_simulation();
+		mcts_backpropagation();
+		}
+	}
+
+	public void see_suggested_move()
+	{
+		int index = mcts.suggested_action_index();
+		view_mnk_state(mcts.root_node.state.imagine_action(index));
 	}
 
 }
@@ -246,19 +278,47 @@ public class MCTS
 		this.lose_value = lose_value;
 
 	}
-	public void iteration()
+	public void iteration(int max_iterations = 1)
 	{
-		MCTS_node node = UCT_policy(root_node);
-		GD.Print("Node after UCT_policy: ", node._str());
+		int iteration_count = 0;
 
-		node = random_expansion(node);
-		GD.Print("Node after expansion: ", node._str());
+		while(iteration_count < max_iterations)
+		{
+			MCTS_node node = UCT_policy(root_node);
+			GD.Print("Node after UCT_policy: ", node._str());
+
+			node = random_expansion(node);
+			GD.Print("Node after expansion: ", node._str());
 
 
-		double reward = simulation(node);
-		GD.Print("Reward after simulation: ", Convert.ToString(reward));
+			double reward = simulation(node);
+			GD.Print("Reward after simulation: ", Convert.ToString(reward));
 
-		backpropagate(node, reward);
+			backpropagate(node, reward);
+
+			iteration_count++;
+		}
+		
+
+	}
+
+	public int suggested_action_index()
+	{
+		
+		int action_index = -1;
+		double max_visits = 0;
+		int visits;
+
+		foreach (var child_node in root_node.children)
+		{
+			visits = child_node.Value.visits;
+			if (visits > max_visits)
+			{
+				max_visits = visits;
+				action_index = child_node.Key;
+			}
+		}
+		return action_index;
 		
 
 	}
@@ -266,16 +326,17 @@ public class MCTS
 	{
 		while (!node.is_root)
 		{
-			if (node.state.player_turn == root_node.state.player_turn) new_reward = -new_reward;
-			node.update_reward(new_reward);
+			if (node.state.player_turn == root_node.state.player_turn) node.update_reward(-new_reward);
+			else node.update_reward(new_reward);
 			node = node.parent;
-			GD.Print("Node after backpropagation: ", node._str());
+			//GD.Print("Node after backpropagation: ", node._str());
 		}
 		node.update_reward(0);
 	}
 
 	public double simulation(MCTS_node node)
 	{
+		if(node.state.terminal) return result_to_reward(node.state);
 		double reward =0;
 		for (int i =0; i<rollouts; i++)
 		{
@@ -294,6 +355,7 @@ public class MCTS
 
 	public MCTS_node random_expansion(MCTS_node node)
 	{
+		if (node.state.terminal) return node;
 		var duplicate_state = node.state.duplicate();
 		List<int> available_action_indexes = new List<int>();
 		for (int i = 0; i < node.state.available_actions.Count; i++) available_action_indexes.Add(i);
@@ -307,7 +369,7 @@ public class MCTS
 	public MCTS_node select_UCB(MCTS_node node)
 	{
 
-		MCTS_node max_node = node;
+		int max_key = 0;
 		double max_value = 0;
 		double max_UCB_value;
 
@@ -317,10 +379,10 @@ public class MCTS
 			if (max_UCB_value > max_value)
 			{
 				max_value = max_UCB_value;
-				max_node = child_node.Value;
+				max_key = child_node.Key;
 			}
 		}
-		return max_node;
+		return node.children[max_key];
 	}
 
 	public MCTS_node UCT_policy(MCTS_node node)
@@ -420,7 +482,7 @@ public class mnk_state
 		if (!terminal)
 		{
 			diag.Clear();
-			inv_diag.Clear();
+			inv_diag.Clear(); //test speed versus declaration
 			offset = action.y - action.x;
 			for (int y = 0; y < m; y++)
 			{
@@ -437,14 +499,24 @@ public class mnk_state
 			if (!terminal) { if (k_line(inv_diag.ToArray())) terminal = true; }
 		}
 
-		if (available_actions.Count == 0) terminal = true;
+		available_actions.RemoveAt(action_index);
 		if (terminal) winner = player_turn;
 		else
 		{
-			player_turn = 3 - player_turn;
-			available_actions.RemoveAt(action_index);
-			ply++;
+			if (available_actions.Count == 0) terminal = true;
+			else
+			{
+				player_turn = 3 - player_turn;
+				ply++;
+			}
 		}
+	}
+
+	public mnk_state imagine_action(int action_index)
+	{
+		mnk_state imagined_state = duplicate();
+		imagined_state.make_action(action_index);
+		return imagined_state;
 	}
 
 
@@ -541,3 +613,4 @@ public class mnk_action
 		return the_duplicate;
 	}
 }
+

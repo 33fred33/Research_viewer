@@ -75,6 +75,30 @@ margin_right = 265.0
 margin_bottom = 92.0
 text = "View_root"
 
+[node name="Iterate" type="Button" parent="MCTS_menu"]
+margin_top = 96.0
+margin_right = 117.0
+margin_bottom = 116.0
+text = "Iterate"
+
+[node name="N_iterations" type="HSlider" parent="MCTS_menu"]
+margin_left = 121.0
+margin_top = 96.0
+margin_right = 265.0
+margin_bottom = 112.0
+min_value = 1.0
+step = 10.0
+value = 1.0
+allow_greater = true
+tick_count = 10
+ticks_on_borders = true
+
+[node name="See_suggested" type="Button" parent="MCTS_menu"]
+margin_top = 120.0
+margin_right = 117.0
+margin_bottom = 140.0
+text = "See_suggested"
+
 [connection signal="button_down" from="MCTS_menu/Selection" to="." method="mcts_selection"]
 [connection signal="button_down" from="MCTS_menu/View_selection" to="." method="view_selected_node"]
 [connection signal="button_down" from="MCTS_menu/Expansion" to="." method="mcts_expansion"]
@@ -82,3 +106,5 @@ text = "View_root"
 [connection signal="button_down" from="MCTS_menu/Simulation" to="." method="mcts_simulation"]
 [connection signal="button_down" from="MCTS_menu/Backpropagation" to="." method="mcts_backpropagation"]
 [connection signal="button_down" from="MCTS_menu/View_root" to="." method="mcts_view_root_node"]
+[connection signal="button_down" from="MCTS_menu/Iterate" to="." method="mcts_iterate"]
+[connection signal="button_down" from="MCTS_menu/See_suggested" to="." method="see_suggested_move"]
