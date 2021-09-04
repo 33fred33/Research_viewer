@@ -99,6 +99,88 @@ margin_right = 117.0
 margin_bottom = 140.0
 text = "See_suggested"
 
+[node name="See_parent" type="Button" parent="MCTS_menu"]
+margin_left = 121.0
+margin_top = 120.0
+margin_right = 265.0
+margin_bottom = 140.0
+text = "See parent"
+
+[node name="Tree_inspector" type="ScrollContainer" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 129.0
+margin_top = 250.0
+margin_right = 429.0
+margin_bottom = -20.9999
+rect_scale = Vector2( 0.995764, 1.00221 )
+size_flags_horizontal = 3
+size_flags_vertical = 3
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Tree_data" type="GridContainer" parent="Tree_inspector"]
+margin_right = 300.0
+margin_bottom = 300.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Main_buttons" type="HBoxContainer" parent="Tree_inspector/Tree_data"]
+margin_right = 300.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+
+[node name="Go_to_parent" type="Button" parent="Tree_inspector/Tree_data/Main_buttons"]
+margin_right = 148.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+text = "Go to parent"
+
+[node name="Go_to_selected" type="Button" parent="Tree_inspector/Tree_data/Main_buttons"]
+margin_left = 152.0
+margin_right = 300.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+text = "Go to selected"
+
+[node name="Headers" type="HBoxContainer" parent="Tree_inspector/Tree_data"]
+margin_top = 24.0
+margin_right = 300.0
+margin_bottom = 44.0
+size_flags_horizontal = 3
+
+[node name="View" type="Label" parent="Tree_inspector/Tree_data/Headers"]
+margin_top = 3.0
+margin_right = 72.0
+margin_bottom = 17.0
+size_flags_horizontal = 3
+text = "View"
+align = 1
+clip_text = true
+
+[node name="UCB_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 76.0
+margin_right = 148.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+text = "UCB"
+
+[node name="Visits_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 152.0
+margin_right = 224.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+text = "Visits"
+
+[node name="Reward_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 228.0
+margin_right = 300.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+text = "Rew"
+
 [connection signal="button_down" from="MCTS_menu/Selection" to="." method="mcts_selection"]
 [connection signal="button_down" from="MCTS_menu/View_selection" to="." method="view_selected_node"]
 [connection signal="button_down" from="MCTS_menu/Expansion" to="." method="mcts_expansion"]
@@ -108,3 +190,4 @@ text = "See_suggested"
 [connection signal="button_down" from="MCTS_menu/View_root" to="." method="mcts_view_root_node"]
 [connection signal="button_down" from="MCTS_menu/Iterate" to="." method="mcts_iterate"]
 [connection signal="button_down" from="MCTS_menu/See_suggested" to="." method="see_suggested_move"]
+[connection signal="button_down" from="MCTS_menu/See_parent" to="." method="see_parent"]
