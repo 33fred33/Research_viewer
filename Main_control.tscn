@@ -111,9 +111,9 @@ anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 129.0
-margin_top = 250.0
+margin_top = 180.0
 margin_right = 429.0
-margin_bottom = -20.9999
+margin_bottom = 9.00012
 rect_scale = Vector2( 0.995764, 1.00221 )
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -123,7 +123,7 @@ __meta__ = {
 
 [node name="Tree_data" type="GridContainer" parent="Tree_inspector"]
 margin_right = 300.0
-margin_bottom = 300.0
+margin_bottom = 400.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
@@ -191,3 +191,4 @@ text = "Rew"
 [connection signal="button_down" from="MCTS_menu/Iterate" to="." method="mcts_iterate"]
 [connection signal="button_down" from="MCTS_menu/See_suggested" to="." method="see_suggested_move"]
 [connection signal="button_down" from="MCTS_menu/See_parent" to="." method="see_parent"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/UCB_sort" to="." method="sort_node_table_ucb"]

@@ -29,12 +29,14 @@ public class Main_control : Control
 	public GridContainer MCTS_menu;
 	public Godot.Button selection_button, simulation_button, expansion_button, backpropagation_button, iterate_button, see_suggested_button;
 	public Godot.HSlider N_iterations;
+	public List<HBoxContainer> node_table_list = new List<HBoxContainer>();
 
 	//Godot items
 
 	//Class variables
 	public bool M_lock = false;
 	public bool N_lock = false;
+	public bool S_lock = false;
 	public Random rand = new Random();
 
 	public override void _Ready()
@@ -46,6 +48,7 @@ public class Main_control : Control
 		this.AddChild(instance_game_viewer);
 		node_data = instance_game_viewer.GetNode<Label>("Node_data");
 		var base_state = new mnk_state();
+		//base_state.set_initial_state(13, 13, 5);
 		base_state.set_initial_state(3, 3, 3);
 		mnk_game_states.Add(base_state);
 		mcts = new MCTS(base_state);
@@ -77,6 +80,23 @@ public class Main_control : Control
 			}
 
 		}
+		if (Input.IsKeyPressed((int)KeyList.S))
+		{
+			if (!S_lock)
+			{
+				S_lock = true;
+				GD.Print("Pressed S");
+				double s_temp_reward = 0;
+				for (int i = 0; i < 1000; i++)
+				{
+					var final_state = showing_node.state.random_game(rand);
+					s_temp_reward += mcts.result_to_reward(final_state);
+					//view_mnk_state(final_state);
+				}
+				node_data.Text = "reward after 1000 rand games from this state: " + Convert.ToString(s_temp_reward);
+			}
+
+		}
 		if (Input.IsKeyPressed((int)KeyList.M))
 		{
 			if (!M_lock)
@@ -94,6 +114,7 @@ public class Main_control : Control
 	{
 		M_lock = false;
 		N_lock=false;
+		S_lock = false;
 	}
 
 	public void view_mnk_state(mnk_state state)
@@ -123,14 +144,114 @@ public class Main_control : Control
 
 	public void view_node(MCTS_node node)
 	{
+		clear_node_table();
 		view_mnk_state(node.state);
 		node_data.Text = (node._str());
 		showing_node = node;
+		view_in_node_table(node);
+	}
+
+	public void view_child_from_showing(int child_index)
+	{
+		GD.Print("In view_child_from_showing" + Convert.ToString(child_index));
+		view_node(showing_node.children[child_index]);
+	}
+
+	public void clear_node_table()
+	{
+		foreach (Godot.HBoxContainer node_data_container in node_table_list)
+		{
+			node_data_container.QueueFree();
+		}
+		node_table_list.Clear();
+	}
+
+	public void sort_node_table_ucb()
+	{
+		var tree_inspector = GetNode<ScrollContainer>("Tree_inspector");
+		var tree_data = tree_inspector.GetNode<GridContainer>("Tree_data");
+
+
+	}
+
+	public void view_in_node_table(MCTS_node node)
+	{
+		double min_ucb = 0;
+		double max_ucb = 0;
+		double max_reward = 0;
+		double min_reward = 0;
+		double max_visits = 0;
+		double min_visits = 1;
+		bool first_time = true;
+
 		foreach (var child_node in node.children)
 		{
+			if (first_time)
+			{
+				max_ucb = child_node.Value.UCB(mcts.c);
+				min_ucb = child_node.Value.UCB(mcts.c);
+				max_reward = child_node.Value.reward;
+				min_reward = child_node.Value.reward;
+				max_visits = child_node.Value.visits;
+				//min_visits = child_node.Value.visits;
+
+			}
+			else
+			{
+				double child_ucb = child_node.Value.UCB(mcts.c);
+				if (child_ucb < min_ucb) min_ucb = child_ucb;
+				else if (child_ucb > max_ucb) max_ucb = child_ucb;
+				if (child_node.Value.reward < min_reward) min_reward = child_node.Value.reward;
+				else if (child_node.Value.reward > max_reward) max_reward = child_node.Value.reward;
+				//if (child_node.Value.visits < min_visits) min_visits = child_node.Value.visits;
+				if (child_node.Value.visits > max_visits) max_visits = child_node.Value.visits;
+
+			}
 			Godot.HBoxContainer instance_node_inspector = (HBoxContainer)node_table.Instance();
+			instance_node_inspector.Connect("pressed_view_child", this, "view_child_from_showing");
+			Label child_index = (Label)instance_node_inspector.GetNode<Label>("Child_index");
+			child_index.Text = Convert.ToString(child_node.Key);
+			//botonsitodecandela.Node_data.child_node_index = child_node.Key;
 			tree_data.AddChild(instance_node_inspector);
+			node_table_list.Add(instance_node_inspector);
+			first_time = false;
+			
 		}
+		GD.Print("Children in list:", node_table_list.Count, " Children in node:", node.children.Count);
+		foreach(var child_node in node.children)
+		//foreach (var node_row in node_table_list)
+		{
+			GD.Print(child_node.Key);
+			bool found = false;
+			HBoxContainer node_row = new HBoxContainer();
+			foreach(var row in node_table_list)
+			{
+				Label child_index = (Label)row.GetNode<Label>("Child_index");
+				if (child_index.Text == Convert.ToString(child_node.Key))
+				{
+					node_row = row;
+					found = true;
+				}
+			}
+			if (!found) GD.Print("Node not found");
+			else
+			{
+				//var node_row = node_table_list[child_node.Key];
+				Godot.ProgressBar ucb_progress = node_row.GetNode<ProgressBar>("UCB_relative");
+				ucb_progress.MinValue = min_ucb;
+				ucb_progress.MaxValue = max_ucb;
+				ucb_progress.Value = child_node.Value.UCB(mcts.c);
+				Godot.ProgressBar reward_progress = node_row.GetNode<ProgressBar>("Rew_relative");
+				reward_progress.MinValue = min_reward;
+				reward_progress.MaxValue = max_reward;
+				reward_progress.Value = child_node.Value.reward;
+				Godot.ProgressBar visits_progress = node_row.GetNode<ProgressBar>("Visits_relative");
+				visits_progress.MinValue = min_visits;
+				visits_progress.MaxValue = max_visits;
+				visits_progress.Value = child_node.Value.visits;
+			}
+		}
+
 	}
 
 	public void mcts_view_root_node()
@@ -280,7 +401,7 @@ public class MCTS
 	public double lose_value;
 	public Random rand = new Random();
 
-	public MCTS(mnk_state root_state, double c = 2, int rollouts = 100, double win_value = 1, double draw_value = 0, double lose_value = -1)
+	public MCTS(mnk_state root_state, double c = 2, int rollouts = 200, double win_value = 1, double draw_value = 0, double lose_value = -1)
 	{
 		root_node = new MCTS_node(root_state, null, true);
 		this.c = c;
@@ -596,10 +717,11 @@ public class mnk_state
 
 	public mnk_state random_game(Random rand)
 	{
+		//rand = new Random();
 		var ds = this.duplicate();
 		while (!ds.terminal)
 		{
-			ds.make_action(rand.Next(ds.available_actions.Count));
+			ds.make_action(rand.Next(0,ds.available_actions.Count));
 		}
 		return ds;
 	}

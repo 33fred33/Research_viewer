@@ -3,7 +3,6 @@ using System;
 
 public class View_node : Button
 {
-	public Godot.Control Main_control;
 	
 	//public delegate void 
 
