@@ -1,8 +1,10 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Linq;
 using System.Diagnostics;
+using System.Threading;
 
 
 public class Main_control : Control
@@ -48,8 +50,12 @@ public class Main_control : Control
 		this.AddChild(instance_game_viewer);
 		node_data = instance_game_viewer.GetNode<Label>("Node_data");
 		var base_state = new mnk_state();
-		//base_state.set_initial_state(13, 13, 5);
-		base_state.set_initial_state(3, 3, 3);
+		//base_state.set_initial_state(13, 13, 5); //gomoku
+		//base_state.set_initial_state(19, 19, 5); //freestyle gomoku
+		//base_state.set_initial_state(5, 5, 4); // draw
+		//base_state.set_initial_state(6, 6, 5); // draw
+		//base_state.set_initial_state(3, 3, 3); //draw tictactoe
+		base_state.set_initial_state(6, 5, 4); //is a win
 		mnk_game_states.Add(base_state);
 		mcts = new MCTS(base_state);
 		MCTS_menu = GetNode<GridContainer>("MCTS_menu");
@@ -87,13 +93,13 @@ public class Main_control : Control
 				S_lock = true;
 				GD.Print("Pressed S");
 				double s_temp_reward = 0;
-				for (int i = 0; i < 1000; i++)
+				for (int i = 0; i < 10000; i++)
 				{
 					var final_state = showing_node.state.random_game(rand);
 					s_temp_reward += mcts.result_to_reward(final_state);
 					//view_mnk_state(final_state);
 				}
-				node_data.Text = "reward after 1000 rand games from this state: " + Convert.ToString(s_temp_reward);
+				node_data.Text = "reward after 10000 rand games from this state: " + Convert.ToString(s_temp_reward);
 			}
 
 		}
@@ -131,7 +137,7 @@ public class Main_control : Control
 			for (int y = 0; y < state.m; y++)
 			{
 				temp_vec = new Vector2(x, y);
-				content = (int)state.board[x][y];
+				content = (int)state.board[y][x];
 				if (content != 0)
 				{
 					content = content + 2;
@@ -140,6 +146,9 @@ public class Main_control : Control
 				else mnk_tilemap.SetCellv(temp_vec, 1);
 			}
 		}
+		string feature_string = "";
+		foreach (var feature in state.feature_vector) feature_string += feature.Value;
+		GD.Print(feature_string);
 	}
 
 	public void view_node(MCTS_node node)
@@ -148,12 +157,12 @@ public class Main_control : Control
 		view_mnk_state(node.state);
 		node_data.Text = (node._str());
 		showing_node = node;
-		view_in_node_table(node);
+		view_in_node_table();//node);
 	}
 
 	public void view_child_from_showing(int child_index)
 	{
-		GD.Print("In view_child_from_showing" + Convert.ToString(child_index));
+		//GD.Print("In view_child_from_showing" + Convert.ToString(child_index));
 		view_node(showing_node.children[child_index]);
 	}
 
@@ -168,13 +177,83 @@ public class Main_control : Control
 
 	public void sort_node_table_ucb()
 	{
-		var tree_inspector = GetNode<ScrollContainer>("Tree_inspector");
-		var tree_data = tree_inspector.GetNode<GridContainer>("Tree_data");
-
+		double safe_counter = 0.00000000001;
+		SortedList sorted_nodes = new SortedList();
+		foreach (HBoxContainer node_table_container in node_table_list)
+		{
+			Label node_index_label = node_table_container.GetNode<Label>("Child_index");
+			int child_index = Convert.ToInt32(node_index_label.Text);
+			//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
+			try {sorted_nodes.Add(showing_node.children[child_index].UCB(mcts.c) , node_table_container);}
+			catch
+			{
+				sorted_nodes.Add(showing_node.children[child_index].UCB(mcts.c) + safe_counter, node_table_container);
+				safe_counter += 0.00000000001;
+			}
+		}
+		
+		int counter = 0;
+		for (int i=sorted_nodes.Count-1; i>=0; i--)
+		{
+			counter++;
+			tree_data.MoveChild((HBoxContainer)sorted_nodes.GetByIndex(i), counter+2);
+		}
 
 	}
 
-	public void view_in_node_table(MCTS_node node)
+	public void sort_node_table_visits()
+	{
+		double safe_counter = 0.00000000001;
+		SortedList sorted_nodes = new SortedList();
+		foreach (HBoxContainer node_table_container in node_table_list)
+		{
+			Label node_index_label = node_table_container.GetNode<Label>("Child_index");
+			int child_index = Convert.ToInt32(node_index_label.Text);
+			//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
+			try {sorted_nodes.Add((double)showing_node.children[child_index].visits , node_table_container);}
+			catch
+			{
+				sorted_nodes.Add((double)showing_node.children[child_index].visits + safe_counter, node_table_container);
+				safe_counter += 0.00000000001;
+			}
+		}
+		
+		int counter = 0;
+		for (int i=sorted_nodes.Count-1; i>=0; i--)
+		{
+			counter ++;
+			tree_data.MoveChild((HBoxContainer)sorted_nodes.GetByIndex(i), counter+2);
+		}
+
+	}
+
+	public void sort_node_table_reward()
+	{
+		double safe_counter = 0.00000000001;
+		SortedList sorted_nodes = new SortedList();
+		foreach (HBoxContainer node_table_container in node_table_list)
+		{
+			Label node_index_label = node_table_container.GetNode<Label>("Child_index");
+			int child_index = Convert.ToInt32(node_index_label.Text);
+			//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
+			try {sorted_nodes.Add(showing_node.children[child_index].reward , node_table_container);}
+			catch
+			{
+				sorted_nodes.Add(showing_node.children[child_index].reward + safe_counter, node_table_container);
+				safe_counter += 0.00000000001;
+			}
+		}
+		
+		int counter = 0;
+		for (int i=sorted_nodes.Count-1; i>=0; i--)
+		{
+			counter++;
+			tree_data.MoveChild((HBoxContainer)sorted_nodes.GetByIndex(i), counter+2);
+		}
+
+	}
+
+	public void view_in_node_table()//MCTS_node node)
 	{
 		double min_ucb = 0;
 		double max_ucb = 0;
@@ -183,6 +262,7 @@ public class Main_control : Control
 		double max_visits = 0;
 		double min_visits = 1;
 		bool first_time = true;
+		MCTS_node node = showing_node;
 
 		foreach (var child_node in node.children)
 		{
@@ -193,7 +273,8 @@ public class Main_control : Control
 				max_reward = child_node.Value.reward;
 				min_reward = child_node.Value.reward;
 				max_visits = child_node.Value.visits;
-				//min_visits = child_node.Value.visits;
+				min_visits = child_node.Value.visits;
+				first_time = false;
 
 			}
 			else
@@ -203,25 +284,24 @@ public class Main_control : Control
 				else if (child_ucb > max_ucb) max_ucb = child_ucb;
 				if (child_node.Value.reward < min_reward) min_reward = child_node.Value.reward;
 				else if (child_node.Value.reward > max_reward) max_reward = child_node.Value.reward;
-				//if (child_node.Value.visits < min_visits) min_visits = child_node.Value.visits;
-				if (child_node.Value.visits > max_visits) max_visits = child_node.Value.visits;
+				if (child_node.Value.visits < min_visits) min_visits = child_node.Value.visits;
+				else if (child_node.Value.visits > max_visits) max_visits = child_node.Value.visits;
 
 			}
 			Godot.HBoxContainer instance_node_inspector = (HBoxContainer)node_table.Instance();
 			instance_node_inspector.Connect("pressed_view_child", this, "view_child_from_showing");
 			Label child_index = (Label)instance_node_inspector.GetNode<Label>("Child_index");
 			child_index.Text = Convert.ToString(child_node.Key);
-			//botonsitodecandela.Node_data.child_node_index = child_node.Key;
 			tree_data.AddChild(instance_node_inspector);
 			node_table_list.Add(instance_node_inspector);
-			first_time = false;
+			
 			
 		}
-		GD.Print("Children in list:", node_table_list.Count, " Children in node:", node.children.Count);
+		//GD.Print("Children in list:", node_table_list.Count, " Children in node:", node.children.Count);
 		foreach(var child_node in node.children)
 		//foreach (var node_row in node_table_list)
 		{
-			GD.Print(child_node.Key);
+			//GD.Print(child_node.Key);
 			bool found = false;
 			HBoxContainer node_row = new HBoxContainer();
 			foreach(var row in node_table_list)
@@ -251,7 +331,7 @@ public class Main_control : Control
 				visits_progress.Value = child_node.Value.visits;
 			}
 		}
-
+		sort_node_table_reward();
 	}
 
 	public void mcts_view_root_node()
@@ -293,6 +373,27 @@ public class Main_control : Control
 
 	public void mcts_iterate()
 	{
+		/*
+		System.Threading.Thread t = new System.Threading.Thread(() => thread_iter());
+		try{
+		t.Start();
+		}
+		catch{GD.Print("Thread issue, try again");}
+		*/
+		thread_iter();
+		/*
+		for (int i = 0; i < N_iterations.Value; i++)
+		{
+		mcts_selection();
+		mcts_expansion();
+		mcts_simulation();
+		mcts_backpropagation();
+		view_expanded_node();
+		}*/
+	}
+
+	public void thread_iter()
+	{
 		for (int i = 0; i < N_iterations.Value; i++)
 		{
 		mcts_selection();
@@ -307,6 +408,7 @@ public class Main_control : Control
 	{
 		//int index = mcts.suggested_action_index();
 		int index = mcts.robust_action_index();
+		//GD.Print("Best actions index: ", index, " children ", mcts.root_node.children.Count);
 		view_node(mcts.root_node.children[index]);
 	}
 
@@ -387,9 +489,21 @@ public class MCTS_node
 		return s;
 	}
 
+}
 
+public class Pattern_individual
+{
+	public Dictionary<int, int> pattern = new Dictionary<int, int>();
+	public int visits = 1;
+	public int age = 0;
+	public double reward; //how different the reward is when the pattern appears?
+	public Pattern_individual(Dictionary<int, int> new_pattern)
+	{
+		pattern = new_pattern;
+	}
 
 }
+
 
 public class MCTS
 {
@@ -401,7 +515,12 @@ public class MCTS
 	public double lose_value;
 	public Random rand = new Random();
 
-	public MCTS(mnk_state root_state, double c = 2, int rollouts = 200, double win_value = 1, double draw_value = 0, double lose_value = -1)
+	//EA variables
+	public int pop_size = 100;
+	public int initialization_max_depth = 5;
+	public int max_initial_complexity = 3;
+
+	public MCTS(mnk_state root_state, double c = 2, int rollouts = 100, double win_value = 1, double draw_value = 0, double lose_value = -1)
 	{
 		root_node = new MCTS_node(root_state, null, true);
 		this.c = c;
@@ -458,8 +577,8 @@ public class MCTS
 
 	public int robust_action_index()
 	{
-		int action_index = -1;
-		double max_reward = 0;
+		int action_index = 0;
+		double max_reward = double.NegativeInfinity;//-999999;
 		double reward;
 
 		foreach (var child_node in root_node.children)
@@ -474,14 +593,13 @@ public class MCTS
 		return action_index;
 	}
 
-
-
 	public void backpropagate(MCTS_node node, double new_reward)
 	{
 		while (!node.is_root)
 		{
 			if (node.state.player_turn == root_node.state.player_turn) node.update_reward(-new_reward);
 			else node.update_reward(new_reward);
+			//node.update_reward(new_reward);
 			node = node.parent;
 			//GD.Print("Node after backpropagation: ", node._str());
 		}
@@ -549,25 +667,42 @@ public class MCTS
 		return node;
 	}
 
-
-}
-
-/*
-public class MCTS_EA : MCTS
-{
-
-	public MCTS_EA(mnk_state root_state, double c = 2, int rollouts = 100, double win_value = 1, double draw_value = 0, double lose_value = -1)
+	public Dictionary<int, int> random_uniform_pattern(MCTS_node node)
 	{
-		root_node = new MCTS_node(root_state, null, true);
-		this.c = c;
-		this.rollouts = rollouts;
-		this.win_value = win_value;
-		this.draw_value = draw_value;
-		this.lose_value = lose_value;
-
+		Dictionary<int, int> pattern = new Dictionary<int, int>();
+		int size = rand.Next(1, max_initial_complexity);
+		int new_key;
+		List<int> keys = new List<int>();
+		while (keys.Count < size)
+		{
+			new_key = rand.Next(node.state.feature_vector.Count);
+			if (!keys.Contains(new_key))
+			{
+				keys.Add(new_key);
+			}
+		}
+		foreach (int key in keys)
+		{
+			pattern[key] = node.state.feature_vector[key];
+		}
+		return pattern;
 	}
+
+	public bool pattern_match(Pattern_individual ind, MCTS_node node)
+	{
+		foreach (var pattern in ind.pattern)
+		{
+			if (pattern.Value != node.state.feature_vector[pattern.Key])
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+	
 }
-*/
+
+
 
 
 
@@ -582,6 +717,14 @@ public class mnk_state
 	private List<int> diag = new List<int>();
 	private List<int> inv_diag = new List<int>();
 	private int offset;
+	public Dictionary<int, int> feature_vector = new Dictionary<int, int>();
+	private Dictionary<int, int[]> feature_index_to_board_coordinates = new Dictionary<int, int[]>();
+	public int[][] coordinates_to_feature_index;
+	//private Dictionary<int[], int> coordinates_to_feature_index = new Dictionary<int[], int>();
+
+	
+
+	//public unsafe int*[] feature_vector_pointers;
 
 	//public mnk_state(int m, int n, int k, int player_turn, int ply, int winner, int[][] board, List<mnk_action>, bool terminal)
 	//{
@@ -601,25 +744,30 @@ public class mnk_state
 		available_actions.Clear();// }
 
 		//Initialize the board and available actions
+		int counter = 0;
 		board = new int[m][];
+		coordinates_to_feature_index = new int[m][];
 		for (int y = 0; y < m; y++)
 		{
 			board[y] = new int[n];
+			coordinates_to_feature_index[y] = new int[n];
 			for (int x = 0; x < n; x++)
 			{
-				mnk_action action = new mnk_action { x = x, y = y };
+				mnk_action action = new mnk_action(x,y);// { x = x , y = y };
 				available_actions.Add(action);
+				feature_index_to_board_coordinates[counter] = new int[] {x,y};
+				coordinates_to_feature_index[y][x] = counter;
+				counter ++;
 			}
 		}
-
-
+		set_feature_vector();
 	}
 
 	public void make_action(int action_index)
 	{
 		var action = available_actions[action_index];
 		board[action.y][action.x] = player_turn;
-
+		feature_vector[coordinates_to_feature_index[action.y][action.x]] = player_turn;
 
 		//Horizontal
 		if (k_line(board[action.y])) terminal = true;
@@ -643,14 +791,17 @@ public class mnk_state
 				for (int x = 0; x < n; x++)
 				{
 					if (y - x == offset) diag.Add(board[y][x]);
-					else
-					{
-						if (x + y == action.x + action.y) inv_diag.Add(board[y][x]);
-					}
+					if (x + y == action.x + action.y) inv_diag.Add(board[y][x]);
 				}
 			}
+			//string inv_diag_str = "";
+			//foreach (int d in inv_diag) inv_diag_str += d;
+			//GD.Print("In move ", action.x, "," ,action.y, " inv diag: ", inv_diag_str);
 			if (k_line(diag.ToArray())) terminal = true;
-			if (!terminal) { if (k_line(inv_diag.ToArray())) terminal = true; }
+			if (!terminal) 
+			{ 
+				if (k_line(inv_diag.ToArray())) terminal = true; 
+			}
 		}
 
 		available_actions.RemoveAt(action_index);
@@ -661,6 +812,7 @@ public class mnk_state
 			else
 			{
 				player_turn = 3 - player_turn;
+				//feature_vector[0] = player_turn;
 				ply++;
 			}
 		}
@@ -672,7 +824,6 @@ public class mnk_state
 		imagined_state.make_action(action_index);
 		return imagined_state;
 	}
-
 
 	public bool k_line(int[] sequence)
 	{
@@ -703,7 +854,7 @@ public class mnk_state
 	public void view_state()
 	{
 		string string_row = "";
-		GD.Print("Printing mnk state");
+		//GD.Print("Printing mnk state");
 		foreach (int[] row in board)
 		{
 			string_row = "";
@@ -726,6 +877,44 @@ public class mnk_state
 		return ds;
 	}
 
+	public unsafe void set_feature_vector_pointers()//feature_vector()
+	{
+		/*
+		int feature_vector_length = n*m+1;
+		feature_vector_pointers = new int*[feature_vector_length];
+		for (int i = 0; i < feature_vector_length; i++)
+		{
+			feature_vector_pointers[i] = null;
+		}
+		fixed(int* temp_pointer = &player_turn)
+		{
+			feature_vector_pointers[0] = temp_pointer;
+		}
+		
+		fixed(int* temp_pointer = &board)
+		{
+			feature_vector_pointers[0] = temp_pointer;
+		}
+		feature_vector_pointers[0] = &player_turn;
+		for (int y = 0; y < m; y++)
+		{
+			for (int x = 0; x < n; x++)
+			{
+				feature_vector.Add(board[x][y]);
+			}
+		}*/
+
+	}
+
+	public void  set_feature_vector() //Dictionary<int, int>
+	{
+		//feature_vector[0] = player_turn;
+		foreach (var pair in feature_index_to_board_coordinates)
+		{
+			feature_vector[pair.Key] = board[pair.Value[1]][pair.Value[0]];
+		}
+		//return feature_vector;
+	}
 
 	public mnk_state duplicate()
 	{
@@ -739,6 +928,11 @@ public class mnk_state
 		{
 			duplicate_actions.Add(action.duplicate());
 		}
+		Dictionary<int, int> duplicate_feature_vector = new Dictionary<int, int>();
+		foreach (var feature in feature_vector)
+		{
+			duplicate_feature_vector[feature.Key] = feature.Value;
+		}
 
 		mnk_state the_duplicate = new mnk_state
 		{
@@ -750,11 +944,19 @@ public class mnk_state
 			winner = winner,
 			board = duplicate_board,
 			available_actions = duplicate_actions,
-			terminal = terminal
+			terminal = terminal,
+			feature_index_to_board_coordinates = feature_index_to_board_coordinates,
+			coordinates_to_feature_index = coordinates_to_feature_index,
+			feature_vector = duplicate_feature_vector
 		};
 
 		return the_duplicate;
 	}
+
+	
+
+	
+
 
 }
 
@@ -762,9 +964,14 @@ public class mnk_action
 {
 	public int x, y;
 
+	public mnk_action(int new_x, int new_y)
+	{
+		x = new_x;
+		y = new_y;
+	}
 	public mnk_action duplicate()
 	{
-		mnk_action the_duplicate = new mnk_action { x = x, y = y };
+		mnk_action the_duplicate = new mnk_action(x,y);// { x = x, y = y };
 		return the_duplicate;
 	}
 }

@@ -52,7 +52,7 @@ text = "View expanded state"
 margin_top = 48.0
 margin_right = 117.0
 margin_bottom = 68.0
-text = "Simulation"
+text = "Rollout"
 
 [node name="Reward" type="Label" parent="MCTS_menu"]
 margin_left = 121.0
@@ -79,7 +79,7 @@ text = "View_root"
 margin_top = 96.0
 margin_right = 117.0
 margin_bottom = 116.0
-text = "Iterate"
+text = "Simulations"
 
 [node name="N_iterations" type="HSlider" parent="MCTS_menu"]
 margin_left = 121.0
@@ -87,7 +87,8 @@ margin_top = 96.0
 margin_right = 265.0
 margin_bottom = 112.0
 min_value = 1.0
-step = 10.0
+max_value = 1000.0
+step = 50.0
 value = 1.0
 allow_greater = true
 tick_count = 10
@@ -192,3 +193,5 @@ text = "Rew"
 [connection signal="button_down" from="MCTS_menu/See_suggested" to="." method="see_suggested_move"]
 [connection signal="button_down" from="MCTS_menu/See_parent" to="." method="see_parent"]
 [connection signal="button_down" from="Tree_inspector/Tree_data/Headers/UCB_sort" to="." method="sort_node_table_ucb"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Visits_sort" to="." method="sort_node_table_visits"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Reward_sort" to="." method="sort_node_table_reward"]
