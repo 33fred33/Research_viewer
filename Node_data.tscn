@@ -50,3 +50,5 @@ margin_right = 300.0
 margin_bottom = 17.0
 
 [connection signal="button_down" from="View_node" to="." method="on_view_child_node" binds= [ 0 ]]
+[connection signal="mouse_entered" from="View_node" to="." method="on_hover_child_node" binds= [ 0 ]]
+[connection signal="mouse_exited" from="View_node" to="." method="on_exit_hover"]

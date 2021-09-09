@@ -1,0 +1,66 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://scripts/View_node.cs" type="Script" id=1]
+
+[node name="Ind_data" type="HBoxContainer"]
+margin_top = 48.0
+margin_right = 300.0
+margin_bottom = 68.0
+size_flags_horizontal = 3
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="View_node" type="Button" parent="."]
+margin_right = 46.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+text = "View"
+script = ExtResource( 1 )
+
+[node name="Age" type="Label" parent="."]
+margin_left = 50.0
+margin_top = 3.0
+margin_right = 97.0
+margin_bottom = 17.0
+size_flags_horizontal = 3
+size_flags_vertical = 6
+
+[node name="Visits" type="Label" parent="."]
+margin_left = 101.0
+margin_top = 3.0
+margin_right = 148.0
+margin_bottom = 17.0
+size_flags_horizontal = 3
+size_flags_vertical = 6
+
+[node name="Reward" type="Label" parent="."]
+margin_left = 152.0
+margin_top = 3.0
+margin_right = 198.0
+margin_bottom = 17.0
+size_flags_horizontal = 3
+size_flags_vertical = 6
+
+[node name="Certainty" type="Label" parent="."]
+margin_left = 202.0
+margin_top = 3.0
+margin_right = 249.0
+margin_bottom = 17.0
+size_flags_horizontal = 3
+size_flags_vertical = 6
+
+[node name="Deviation" type="Label" parent="."]
+margin_left = 253.0
+margin_top = 3.0
+margin_right = 300.0
+margin_bottom = 17.0
+size_flags_horizontal = 3
+size_flags_vertical = 6
+
+[node name="Individual_index" type="Label" parent="."]
+visible = false
+margin_left = 300.0
+margin_top = 3.0
+margin_right = 300.0
+margin_bottom = 17.0

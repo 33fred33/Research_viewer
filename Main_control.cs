@@ -9,18 +9,19 @@ using System.Threading;
 
 public class Main_control : Control
 {
-
 	//mnk game variables
 	[Export]
 	public Godot.TileSet mnk_tileset;
 	Godot.PackedScene mnk_game_viewer;
 	Godot.PackedScene node_table;
+	Godot.PackedScene ind_table;
 	Godot.VBoxContainer instance_game_viewer;
 	Godot.Label node_data;
 	public List<mnk_state> mnk_game_states = new List<mnk_state>();
 	public Godot.ScrollContainer tree_inspector;
+	public Godot.ScrollContainer pop_inspector;
 	public Godot.GridContainer tree_data;
-
+	public Godot.GridContainer pop_data;
 	//MCTS variables
 	public MCTS mcts;
 	public MCTS_node selected_node;
@@ -32,9 +33,7 @@ public class Main_control : Control
 	public Godot.Button selection_button, simulation_button, expansion_button, backpropagation_button, iterate_button, see_suggested_button;
 	public Godot.HSlider N_iterations;
 	public List<HBoxContainer> node_table_list = new List<HBoxContainer>();
-
-	//Godot items
-
+	public List<HBoxContainer> ind_table_list = new List<HBoxContainer>();
 	//Class variables
 	public bool M_lock = false;
 	public bool N_lock = false;
@@ -45,6 +44,7 @@ public class Main_control : Control
 	{
 		mnk_game_viewer = (PackedScene)GD.Load("res://mnk_game_view.tscn");
 		node_table = (PackedScene)GD.Load("res://Node_data.tscn");
+		ind_table = (PackedScene)GD.Load("res://Individual_view.tscn");
 		instance_game_viewer = (VBoxContainer)mnk_game_viewer.Instance();
 		instance_game_viewer.SetPosition(this.RectPosition);
 		this.AddChild(instance_game_viewer);
@@ -68,9 +68,10 @@ public class Main_control : Control
 		N_iterations = MCTS_menu.GetNode<HSlider>("N_iterations");
 		see_suggested_button = MCTS_menu.GetNode<Button>("See_suggested");
 		tree_inspector = (ScrollContainer)GetNode<ScrollContainer>("Tree_inspector");
+		pop_inspector = (ScrollContainer)GetNode<ScrollContainer>("Pop_inspector");
 		tree_data = tree_inspector.GetNode<GridContainer>("Tree_data");
+		pop_data = pop_inspector.GetNode<GridContainer>("Pop_data");
 	}
-
 	public override void _Process(float delta)
 	{
 		free_keys();
@@ -80,7 +81,7 @@ public class Main_control : Control
 			{
 				N_lock = true;
 				GD.Print("Pressed N");
-				var final_state = mnk_game_states[0].random_game(rand);
+				var final_state = mnk_game_states[0].random_game();
 				view_mnk_state(final_state);
 				node_data.Text = "winner: " + Convert.ToString(final_state.winner);
 			}
@@ -95,7 +96,7 @@ public class Main_control : Control
 				double s_temp_reward = 0;
 				for (int i = 0; i < 10000; i++)
 				{
-					var final_state = showing_node.state.random_game(rand);
+					var final_state = showing_node.state.random_game();
 					s_temp_reward += mcts.result_to_reward(final_state);
 					//view_mnk_state(final_state);
 				}
@@ -115,14 +116,12 @@ public class Main_control : Control
 
 		}
 	}
-
 	public void free_keys()
 	{
 		M_lock = false;
 		N_lock=false;
 		S_lock = false;
 	}
-
 	public void view_mnk_state(mnk_state state)
 	{
 		//state.view_state();
@@ -150,7 +149,6 @@ public class Main_control : Control
 		foreach (var feature in state.feature_vector) feature_string += feature.Value;
 		GD.Print(feature_string);
 	}
-
 	public void view_node(MCTS_node node)
 	{
 		clear_node_table();
@@ -159,13 +157,18 @@ public class Main_control : Control
 		showing_node = node;
 		view_in_node_table();//node);
 	}
-
+	public void view_child_state_from_showing(int child_index)
+	{
+		view_mnk_state(showing_node.children[child_index].state);
+	}
+	public void return_view_to_showing_node()
+	{
+		view_mnk_state(showing_node.state);
+	}
 	public void view_child_from_showing(int child_index)
 	{
-		//GD.Print("In view_child_from_showing" + Convert.ToString(child_index));
 		view_node(showing_node.children[child_index]);
 	}
-
 	public void clear_node_table()
 	{
 		foreach (Godot.HBoxContainer node_data_container in node_table_list)
@@ -174,7 +177,6 @@ public class Main_control : Control
 		}
 		node_table_list.Clear();
 	}
-
 	public void sort_node_table_ucb()
 	{
 		double safe_counter = 0.00000000001;
@@ -200,7 +202,6 @@ public class Main_control : Control
 		}
 
 	}
-
 	public void sort_node_table_visits()
 	{
 		double safe_counter = 0.00000000001;
@@ -226,7 +227,6 @@ public class Main_control : Control
 		}
 
 	}
-
 	public void sort_node_table_reward()
 	{
 		double safe_counter = 0.00000000001;
@@ -252,7 +252,6 @@ public class Main_control : Control
 		}
 
 	}
-
 	public void view_in_node_table()//MCTS_node node)
 	{
 		double min_ucb = 0;
@@ -290,6 +289,9 @@ public class Main_control : Control
 			}
 			Godot.HBoxContainer instance_node_inspector = (HBoxContainer)node_table.Instance();
 			instance_node_inspector.Connect("pressed_view_child", this, "view_child_from_showing");
+			instance_node_inspector.Connect("hovered_view_child", this, "view_child_state_from_showing");
+			instance_node_inspector.Connect("exit_hover", this, "return_view_to_showing_node");
+			
 			Label child_index = (Label)instance_node_inspector.GetNode<Label>("Child_index");
 			child_index.Text = Convert.ToString(child_node.Key);
 			tree_data.AddChild(instance_node_inspector);
@@ -334,43 +336,47 @@ public class Main_control : Control
 		sort_node_table_reward();
 	}
 
+	public void update_pop_table()
+	{
+		foreach (var ind in mcts.postulant_population)
+		{
+			Godot.HBoxContainer instance_ind_inspector = (HBoxContainer)ind_table.Instance();
+			Label ind_index = (Label)instance_ind_inspector.GetNode<Label>("Individual_index");
+			ind_index.Text = Convert.ToString(ind.Key);
+			pop_data.AddChild(instance_ind_inspector);
+			ind_table_list.Add(instance_ind_inspector);
+		}
+	}
 	public void mcts_view_root_node()
 	{
 		view_node(mcts.root_node);
 	}
-
 	public void mcts_selection()
 	{
 		selected_node = mcts.UCT_policy(mcts.root_node);
 	}
-
 	public void mcts_expansion()
 	{
 		if (selected_node.is_leaf()) expanded_node = mcts.random_expansion(selected_node);
 		else GD.Print("mcts_expansion didnt receive a leaf node");
 	}
-
 	public void view_selected_node()
 	{
 		view_node(selected_node);
 	}
-
 	public void view_expanded_node()
 	{
 		view_node(expanded_node);
 	}
-
 	public void mcts_simulation()
 	{
 		temporal_reward = mcts.simulation(expanded_node);
 		reward_label.Text = "Reward: " + Convert.ToString(temporal_reward);
 	}
-
 	public void mcts_backpropagation()
 	{
 		mcts.backpropagate(expanded_node, temporal_reward);
 	}
-
 	public void mcts_iterate()
 	{
 		/*
@@ -391,7 +397,6 @@ public class Main_control : Control
 		view_expanded_node();
 		}*/
 	}
-
 	public void thread_iter()
 	{
 		for (int i = 0; i < N_iterations.Value; i++)
@@ -402,8 +407,8 @@ public class Main_control : Control
 		mcts_backpropagation();
 		view_expanded_node();
 		}
+		//update_pop_table();
 	}
-
 	public void see_suggested_move()
 	{
 		//int index = mcts.suggested_action_index();
@@ -411,19 +416,25 @@ public class Main_control : Control
 		//GD.Print("Best actions index: ", index, " children ", mcts.root_node.children.Count);
 		view_node(mcts.root_node.children[index]);
 	}
-
 	public void see_parent()
 	{
 		if (!showing_node.is_root) view_node(showing_node.parent);
 	}
-
+	public void use_ea()
+	{
+		mcts.initialize_population();
+		update_pop_table();
+	}
 }
 
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//-----------------------------------------------MCTS-------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
 
-
-
-
-// ------------------------MCTS---------------------------------
 public class MCTS_node
 {
 	public int action_index;
@@ -446,26 +457,22 @@ public class MCTS_node
 	{
 		return (children.Count == 0 || state.available_actions.Count != children.Count);
 	}
-
 	public double UCB(double c)
 	{
 		if (visits > 0) return reward / visits + c * Math.Sqrt(Math.Log(parent.visits) / visits);
 		else return double.PositiveInfinity;
 	}
-
 	public MCTS_node add_child(mnk_state child_state, int action_index)
 	{
 		MCTS_node child_node = new MCTS_node (child_state, this, false, action_index);
 		children.Add(action_index, child_node);
 		return child_node;
 	}
-
 	public void update_reward(double new_reward)
 	{
 		visits = visits + 1;
 		reward += new_reward;
 	}
-
 	public int depth()
 	{
 		int depth = 0;
@@ -477,7 +484,6 @@ public class MCTS_node
 		}
 		return depth;
 	}
-
 	public string _str()
 	{
 		string s = "Node. Depth " + Convert.ToString(depth()) 
@@ -491,20 +497,6 @@ public class MCTS_node
 
 }
 
-public class Pattern_individual
-{
-	public Dictionary<int, int> pattern = new Dictionary<int, int>();
-	public int visits = 1;
-	public int age = 0;
-	public double reward; //how different the reward is when the pattern appears?
-	public Pattern_individual(Dictionary<int, int> new_pattern)
-	{
-		pattern = new_pattern;
-	}
-
-}
-
-
 public class MCTS
 {
 	public MCTS_node root_node;
@@ -513,14 +505,22 @@ public class MCTS
 	public double win_value;
 	public double draw_value;
 	public double lose_value;
+	public int active_pop_size;
+	public int postulant_pop_size;
+	public Dictionary<int,Pattern_individual> active_population = new Dictionary<int, Pattern_individual>();
+	public Dictionary<int,Pattern_individual> postulant_population = new Dictionary<int, Pattern_individual>();
+	public int max_initial_complexity;
 	public Random rand = new Random();
 
-	//EA variables
-	public int pop_size = 100;
-	public int initialization_max_depth = 5;
-	public int max_initial_complexity = 3;
-
-	public MCTS(mnk_state root_state, double c = 2, int rollouts = 100, double win_value = 1, double draw_value = 0, double lose_value = -1)
+	public MCTS(mnk_state root_state
+				,double c = 2
+				,int rollouts = 100
+				,double win_value = 1
+				,double draw_value = 0
+				,double lose_value = -1
+				,int active_pop_size = 100
+				,int postulant_pop_size = 100
+				,int max_initial_complexity = 3)
 	{
 		root_node = new MCTS_node(root_state, null, true);
 		this.c = c;
@@ -528,7 +528,9 @@ public class MCTS
 		this.win_value = win_value;
 		this.draw_value = draw_value;
 		this.lose_value = lose_value;
-
+		this.active_pop_size = active_pop_size;
+		this.postulant_pop_size = postulant_pop_size;
+		this.max_initial_complexity = max_initial_complexity;
 	}
 	public void iteration(int max_iterations = 1)
 	{
@@ -537,23 +539,13 @@ public class MCTS
 		while(iteration_count < max_iterations)
 		{
 			MCTS_node node = UCT_policy(root_node);
-			GD.Print("Node after UCT_policy: ", node._str());
-
 			node = random_expansion(node);
-			GD.Print("Node after expansion: ", node._str());
-
-
 			double reward = simulation(node);
-			GD.Print("Reward after simulation: ", Convert.ToString(reward));
-
 			backpropagate(node, reward);
 
 			iteration_count++;
 		}
-		
-
 	}
-
 	public int suggested_action_index()
 	{
 		
@@ -574,7 +566,6 @@ public class MCTS
 		
 
 	}
-
 	public int robust_action_index()
 	{
 		int action_index = 0;
@@ -592,7 +583,6 @@ public class MCTS
 		}
 		return action_index;
 	}
-
 	public void backpropagate(MCTS_node node, double new_reward)
 	{
 		while (!node.is_root)
@@ -605,18 +595,16 @@ public class MCTS
 		}
 		node.update_reward(0);
 	}
-
 	public double simulation(MCTS_node node)
 	{
 		if(node.state.terminal) return result_to_reward(node.state);
 		double reward =0;
 		for (int i =0; i<rollouts; i++)
 		{
-			reward += result_to_reward(node.state.random_game(rand));
+			reward += result_to_reward(node.state.random_game());
 		}
 		return reward/rollouts;
 	}
-
 	public double result_to_reward(mnk_state final_state)
 	{
 
@@ -624,7 +612,6 @@ public class MCTS
 		if (final_state.winner != root_node.state.player_turn) return lose_value;
 		return draw_value;
 	}
-
 	public MCTS_node random_expansion(MCTS_node node)
 	{
 		if (node.state.terminal) return node;
@@ -637,7 +624,6 @@ public class MCTS
 		duplicate_state.make_action(action_index);
 		return node.add_child(duplicate_state, action_index);
 	}
-
 	public MCTS_node select_UCB(MCTS_node node)
 	{
 
@@ -656,7 +642,6 @@ public class MCTS
 		}
 		return node.children[max_key];
 	}
-
 	public MCTS_node UCT_policy(MCTS_node node)
 	{
 		while (!node.is_leaf())
@@ -666,8 +651,53 @@ public class MCTS
 		}
 		return node;
 	}
-
-	public Dictionary<int, int> random_uniform_pattern(MCTS_node node)
+	public void make_root(mnk_state new_state)
+	{
+		int depth = new_state.ply - root_node.state.ply;
+		bool existing_state = false;
+		MCTS_node new_root = root_node;
+		foreach (MCTS_node node in children_at_depth(depth, root_node))
+		{
+			if (node.state == new_state)
+			{
+				new_root = node;
+				existing_state = true;
+				break;
+			}
+		}
+		if(existing_state)
+		{
+			root_node = new_root;
+			new_root.is_root = true;
+			GD.Print("Recycling subtree");
+		}
+		else
+		{
+			new_root = new MCTS_node(new_state, null, true);
+		}
+		
+	}
+	public List<MCTS_node> children_at_depth(int depth, MCTS_node node)
+	{
+		List<MCTS_node> children_list = new List<MCTS_node>();
+		if (depth == 0)
+		{
+			foreach (var child in node.children)
+			{
+				children_list.Add(child.Value);
+			}
+			return children_list;
+		}
+		else
+		{
+			foreach (var child in node.children)
+			{
+				children_list = children_list.Concat(children_at_depth(depth-1, child.Value)).ToList();
+			}
+		}
+		return children_list;
+	}
+	public Dictionary<int, int> random_uniform_pattern(mnk_state state)
 	{
 		Dictionary<int, int> pattern = new Dictionary<int, int>();
 		int size = rand.Next(1, max_initial_complexity);
@@ -675,7 +705,7 @@ public class MCTS
 		List<int> keys = new List<int>();
 		while (keys.Count < size)
 		{
-			new_key = rand.Next(node.state.feature_vector.Count);
+			new_key = rand.Next(state.feature_vector.Count);
 			if (!keys.Contains(new_key))
 			{
 				keys.Add(new_key);
@@ -683,30 +713,74 @@ public class MCTS
 		}
 		foreach (int key in keys)
 		{
-			pattern[key] = node.state.feature_vector[key];
+			pattern[key] = state.feature_vector[key];
 		}
 		return pattern;
 	}
-
-	public bool pattern_match(Pattern_individual ind, MCTS_node node)
+	public bool pattern_match(Dictionary<int,int> pattern, mnk_state state)
 	{
-		foreach (var pattern in ind.pattern)
+		foreach (var feature in pattern)
 		{
-			if (pattern.Value != node.state.feature_vector[pattern.Key])
+			if (feature.Value != state.feature_vector[feature.Key])
 			{
 				return false;
 			}
 		}
 		return true;
 	}
-	
+	public Pattern_individual new_random_uniform_individual(mnk_state state)
+	{
+		mnk_state random_state = state.get_random_future_state();
+		Pattern_individual ind = new Pattern_individual(random_uniform_pattern(random_state));
+		return ind;
+	}
+	public Dictionary<int,Pattern_individual> get_random_initial_population(mnk_state state)
+	{
+		Dictionary<int,Pattern_individual> population = new Dictionary<int,Pattern_individual>();
+		for (int i = 0; i < postulant_pop_size; i++)
+		{
+			population[i] = new_random_uniform_individual(state);
+		}
+		return population;
+	}
+	public void initialize_population()
+	{
+		postulant_population = get_random_initial_population(root_node.state);
+	}
+}
+
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//------------------------------------------------EA--------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+
+public class Pattern_individual
+{
+	public Dictionary<int, int> pattern = new Dictionary<int, int>();
+	public int visits = 1;
+	public int age = 0;
+	public double reward = 0; //how different the reward is when the pattern appears?
+	public double deviation = 0;
+	public Pattern_individual(Dictionary<int, int> new_pattern)
+	{
+		pattern = new_pattern;
+	}
+
 }
 
 
 
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//--------------------------------------------MNK GAME------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------
 
-
-// -----------------------MNK GAME-----------------------------------
 public class mnk_state
 {
 	public int m, n, k, player_turn, ply, winner;
@@ -720,16 +794,7 @@ public class mnk_state
 	public Dictionary<int, int> feature_vector = new Dictionary<int, int>();
 	private Dictionary<int, int[]> feature_index_to_board_coordinates = new Dictionary<int, int[]>();
 	public int[][] coordinates_to_feature_index;
-	//private Dictionary<int[], int> coordinates_to_feature_index = new Dictionary<int[], int>();
-
-	
-
-	//public unsafe int*[] feature_vector_pointers;
-
-	//public mnk_state(int m, int n, int k, int player_turn, int ply, int winner, int[][] board, List<mnk_action>, bool terminal)
-	//{
-
-	//}
+	public Random rand = new Random();
 
 	public void set_initial_state(int new_m, int new_n, int new_k)
 	{
@@ -762,7 +827,6 @@ public class mnk_state
 		}
 		set_feature_vector();
 	}
-
 	public void make_action(int action_index)
 	{
 		var action = available_actions[action_index];
@@ -817,14 +881,12 @@ public class mnk_state
 			}
 		}
 	}
-
 	public mnk_state imagine_action(int action_index)
 	{
 		mnk_state imagined_state = duplicate();
 		imagined_state.make_action(action_index);
 		return imagined_state;
 	}
-
 	public bool k_line(int[] sequence)
 	{
 		if (sequence.Length < k) return false;
@@ -840,7 +902,6 @@ public class mnk_state
 		}
 		return false;
 	}
-
 	public void print_array(int[] sequence)
 	{
 		string string_row = "";
@@ -850,7 +911,6 @@ public class mnk_state
 		}
 		GD.Print(Convert.ToString(string_row));
 	}
-
 	public void view_state()
 	{
 		string string_row = "";
@@ -865,8 +925,7 @@ public class mnk_state
 			GD.Print(Convert.ToString(string_row));
 		}
 	}
-
-	public mnk_state random_game(Random rand)
+	public mnk_state random_game()
 	{
 		//rand = new Random();
 		var ds = this.duplicate();
@@ -876,7 +935,6 @@ public class mnk_state
 		}
 		return ds;
 	}
-
 	public unsafe void set_feature_vector_pointers()//feature_vector()
 	{
 		/*
@@ -905,7 +963,6 @@ public class mnk_state
 		}*/
 
 	}
-
 	public void  set_feature_vector() //Dictionary<int, int>
 	{
 		//feature_vector[0] = player_turn;
@@ -915,7 +972,6 @@ public class mnk_state
 		}
 		//return feature_vector;
 	}
-
 	public mnk_state duplicate()
 	{
 		int[][] duplicate_board = new int[board.Length][];
@@ -952,18 +1008,41 @@ public class mnk_state
 
 		return the_duplicate;
 	}
-
-	
-
-	
-
-
+	public static bool operator == (mnk_state me, mnk_state you)
+	{
+		if (me.m != you.m || me.n != you.n || me.k != you.k) return false;
+		foreach(var feature in me.feature_vector)
+		{
+			if (feature.Value != you.feature_vector[feature.Key]) return false;
+		}
+		return true;
+	}
+	public static bool operator != (mnk_state me, mnk_state you)
+	{
+		if (me.m != you.m || me.n != you.n || me.k != you.k) return true;
+		foreach(var feature in me.feature_vector)
+		{
+			if (feature.Value != you.feature_vector[feature.Key]) return true;
+		}
+		return false;
+	}
+	public mnk_state get_random_future_state()
+	{
+		List <mnk_state> states = new List<mnk_state>();
+		mnk_state state = this;
+		states.Add(state);
+		while (!state.terminal)
+		{
+			state = state.imagine_action(rand.Next(0,state.available_actions.Count));
+			states.Add(state);
+		}
+		return states[rand.Next(0,states.Count)];
+	}
 }
 
 public class mnk_action
 {
 	public int x, y;
-
 	public mnk_action(int new_x, int new_y)
 	{
 		x = new_x;
