@@ -3,9 +3,6 @@ using System;
 
 public class Node_data : HBoxContainer
 {
-	// Declare member variables here. Examples:
-	// private int a = 2;
-	// private string b = "text";
 	
 	[Signal]
 	public delegate void pressed_view_child(int child_node_index);
