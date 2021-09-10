@@ -1,12 +1,14 @@
-[gd_scene load_steps=2 format=2]
+[gd_scene load_steps=3 format=2]
 
 [ext_resource path="res://scripts/View_node.cs" type="Script" id=1]
+[ext_resource path="res://scripts/Individual_view.cs" type="Script" id=2]
 
 [node name="Ind_data" type="HBoxContainer"]
 margin_top = 48.0
 margin_right = 300.0
 margin_bottom = 68.0
 size_flags_horizontal = 3
+script = ExtResource( 2 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -25,6 +27,7 @@ margin_right = 97.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 size_flags_vertical = 6
+align = 1
 
 [node name="Visits" type="Label" parent="."]
 margin_left = 101.0
@@ -33,6 +36,7 @@ margin_right = 148.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 size_flags_vertical = 6
+align = 1
 
 [node name="Reward" type="Label" parent="."]
 margin_left = 152.0
@@ -41,14 +45,16 @@ margin_right = 198.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 size_flags_vertical = 6
+align = 1
 
-[node name="Certainty" type="Label" parent="."]
+[node name="Significance" type="Label" parent="."]
 margin_left = 202.0
 margin_top = 3.0
 margin_right = 249.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 size_flags_vertical = 6
+align = 1
 
 [node name="Deviation" type="Label" parent="."]
 margin_left = 253.0
@@ -57,6 +63,7 @@ margin_right = 300.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 size_flags_vertical = 6
+align = 1
 
 [node name="Individual_index" type="Label" parent="."]
 visible = false
@@ -64,3 +71,6 @@ margin_left = 300.0
 margin_top = 3.0
 margin_right = 300.0
 margin_bottom = 17.0
+
+[connection signal="mouse_entered" from="View_node" to="." method="on_mouse_hover"]
+[connection signal="mouse_exited" from="View_node" to="." method="on_mouse_exit"]

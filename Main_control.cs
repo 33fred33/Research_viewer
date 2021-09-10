@@ -147,7 +147,7 @@ public class Main_control : Control
 		}
 		string feature_string = "";
 		foreach (var feature in state.feature_vector) feature_string += feature.Value;
-		GD.Print(feature_string);
+		//GD.Print(feature_string);
 	}
 	public void view_node(MCTS_node node)
 	{
@@ -341,10 +341,57 @@ public class Main_control : Control
 		foreach (var ind in mcts.postulant_population)
 		{
 			Godot.HBoxContainer instance_ind_inspector = (HBoxContainer)ind_table.Instance();
+			instance_ind_inspector.Connect("view_individual", this, "view_postulant_individual");
+			instance_ind_inspector.Connect("exit_individual", this, "return_view_to_showing_node");
 			Label ind_index = (Label)instance_ind_inspector.GetNode<Label>("Individual_index");
 			ind_index.Text = Convert.ToString(ind.Key);
 			pop_data.AddChild(instance_ind_inspector);
 			ind_table_list.Add(instance_ind_inspector);
+			Label age = (Label)instance_ind_inspector.GetNode<Label>("Age");
+			age.Text = ind.Value.age.ToString("G5");
+			Label visits = (Label)instance_ind_inspector.GetNode<Label>("Visits");
+			visits.Text = ind.Value.visits.ToString("G5");
+			Label reward = (Label)instance_ind_inspector.GetNode<Label>("Reward");
+			reward.Text = ind.Value.reward.ToString("G5");
+			Label significance = (Label)instance_ind_inspector.GetNode<Label>("Significance");
+			significance.Text = ind.Value.significance().ToString("G5");
+			Label deviation = (Label)instance_ind_inspector.GetNode<Label>("Deviation");
+			deviation.Text = ind.Value.deviation().ToString("G5");
+		}
+	}
+
+	public void view_postulant_individual(int individual_index)
+	{
+		Pattern_individual ind = mcts.postulant_population[individual_index];
+		view_pattern(ind.pattern);
+	}
+	public void view_pattern(Dictionary<int, int> pattern)
+	{
+		clear_view();
+		TileMap mnk_tilemap = (TileMap)instance_game_viewer.GetNode<TileMap>("Board");
+		var temp_vec = new Vector2(1, 1);
+		foreach (var feature in pattern)
+		{
+			int[] coordinates = mcts.root_node.state.feature_index_to_board_coordinates[feature.Key];
+			temp_vec = new Vector2(coordinates[0], coordinates[1]);
+			if (feature.Value != 0)
+				{
+					mnk_tilemap.SetCellv(temp_vec, feature.Value + 2);
+				}
+			else mnk_tilemap.SetCellv(temp_vec, 1);
+		}
+	}
+	public void clear_view()
+	{
+		TileMap mnk_tilemap = (TileMap)instance_game_viewer.GetNode<TileMap>("Board");
+		var temp_vec = new Vector2(1, 1);
+		for (int x = 0; x < mcts.root_node.state.n; x++)
+		{
+			for (int y = 0; y < mcts.root_node.state.m; y++)
+			{
+				temp_vec = new Vector2(x, y);
+				mnk_tilemap.SetCellv(temp_vec, 6);
+			}
 		}
 	}
 	public void mcts_view_root_node()
@@ -730,16 +777,23 @@ public class MCTS
 	}
 	public Pattern_individual new_random_uniform_individual(mnk_state state)
 	{
-		mnk_state random_state = state.get_random_future_state();
-		Pattern_individual ind = new Pattern_individual(random_uniform_pattern(random_state));
+		var state_tuple = state.get_random_future_state();
+		Pattern_individual ind = new Pattern_individual(random_uniform_pattern(state_tuple.random_state));
+		ind.update_reward(result_to_reward(state_tuple.final_state));
 		return ind;
 	}
 	public Dictionary<int,Pattern_individual> get_random_initial_population(mnk_state state)
 	{
+		List<double> collective_reward = new List<double>();
 		Dictionary<int,Pattern_individual> population = new Dictionary<int,Pattern_individual>();
 		for (int i = 0; i < postulant_pop_size; i++)
 		{
 			population[i] = new_random_uniform_individual(state);
+			collective_reward.Add(population[i].reward);
+		}
+		foreach (var ind in population)
+		{
+			ind.Value.update_reference_with_list(collective_reward);
 		}
 		return population;
 	}
@@ -760,15 +814,78 @@ public class MCTS
 public class Pattern_individual
 {
 	public Dictionary<int, int> pattern = new Dictionary<int, int>();
-	public int visits = 1;
 	public int age = 0;
-	public double reward = 0; //how different the reward is when the pattern appears?
-	public double deviation = 0;
+	public int visits = 0;
+	public double reward = 0; //cumulative
+	public double reference_reward = 0;
+	public int reference_visits = 0;
+	public bool existing_in_subtree = false;
+	public double reward_sd =0;
+	public double reference_reward_sd = 0;
 	public Pattern_individual(Dictionary<int, int> new_pattern)
 	{
 		pattern = new_pattern;
 	}
+	public void update_reward(double reward)
+	{
+		visits = visits+1;
+		this.reward = this.reward + reward;
+		//reward_sd  - pending
+	}
+	public void update_reference_with_list(List<double> reference_reward_list)
+	{
+		if (reference_visits == 0)
+		{
+			reference_reward_sd = get_sd(reference_reward_list);
+		}
+		else
+		{
+			reference_reward_sd = combine_sd(reference_reward/reference_visits
+											,reference_reward_list.Average()
+											,get_sd(reference_reward_list)
+											,reference_reward_sd
+											,reference_reward_list.Count
+											,reference_visits);
+		}
 
+		foreach (double reference_reward in reference_reward_list)
+		{
+			this.reference_reward += reference_reward;
+		}
+		this.reference_visits += reference_reward_list.Count;
+	}
+	public double deviation()
+	{
+		if (reference_visits > 0 && visits > 0)
+			return Math.Abs(reward/visits - reference_reward/reference_visits);
+		else return 0;
+	}
+	public double significance() //pending
+	{
+		//https://www.educba.com/t-test-formula/
+		return (reference_reward/reference_visits - reward/visits)/Math.Sqrt(reference_reward_sd/reference_visits + reward_sd/visits);
+	}
+	public void make_older()
+	{
+		age ++;
+	}
+	public double get_sd(List<double> someDoubles)
+	{
+		if (someDoubles.Count > 1)
+		{
+			double average = someDoubles.Average();
+			double sumOfSquaresOfDifferences = someDoubles.Select(val => (val - average) * (val - average)).Sum();
+			return Math.Sqrt(sumOfSquaresOfDifferences / (someDoubles.Count-1));
+		}
+		else return 0;
+	}
+
+	public double combine_sd(double mean1, double mean2, double sd1, double sd2, int n1, int n2)
+	{
+		//https://math.stackexchange.com/questions/2971315/how-do-i-combine-standard-deviations-of-two-groups
+		return ((n1-1)*sd1 + (n2-1)*sd2)/(n1+n2-1) + (n1*n2*Math.Pow(mean1-mean2,2))/(n1*n2*(n1+n2-1));
+
+	}
 }
 
 
@@ -792,7 +909,7 @@ public class mnk_state
 	private List<int> inv_diag = new List<int>();
 	private int offset;
 	public Dictionary<int, int> feature_vector = new Dictionary<int, int>();
-	private Dictionary<int, int[]> feature_index_to_board_coordinates = new Dictionary<int, int[]>();
+	public Dictionary<int, int[]> feature_index_to_board_coordinates = new Dictionary<int, int[]>();
 	public int[][] coordinates_to_feature_index;
 	public Random rand = new Random();
 
@@ -963,7 +1080,7 @@ public class mnk_state
 		}*/
 
 	}
-	public void  set_feature_vector() //Dictionary<int, int>
+	public void set_feature_vector() //Dictionary<int, int>
 	{
 		//feature_vector[0] = player_turn;
 		foreach (var pair in feature_index_to_board_coordinates)
@@ -1026,7 +1143,7 @@ public class mnk_state
 		}
 		return false;
 	}
-	public mnk_state get_random_future_state()
+	public (mnk_state random_state, mnk_state final_state) get_random_future_state()
 	{
 		List <mnk_state> states = new List<mnk_state>();
 		mnk_state state = this;
@@ -1036,7 +1153,7 @@ public class mnk_state
 			state = state.imagine_action(rand.Next(0,state.available_actions.Count));
 			states.Add(state);
 		}
-		return states[rand.Next(0,states.Count)];
+		return (states[rand.Next(0,states.Count)], state);
 	}
 }
 

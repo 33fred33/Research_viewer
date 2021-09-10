@@ -127,32 +127,36 @@ margin_right = 276.0
 margin_bottom = 400.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
+custom_constants/vseparation = 0
+custom_constants/hseparation = 0
 
 [node name="Main_buttons" type="HBoxContainer" parent="Tree_inspector/Tree_data"]
 margin_right = 276.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
+custom_constants/separation = 0
 
 [node name="Go_to_parent" type="Button" parent="Tree_inspector/Tree_data/Main_buttons"]
-margin_right = 136.0
+margin_right = 138.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 
 [node name="Go_to_selected" type="Button" parent="Tree_inspector/Tree_data/Main_buttons"]
-margin_left = 140.0
+margin_left = 138.0
 margin_right = 276.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 
 [node name="Headers" type="HBoxContainer" parent="Tree_inspector/Tree_data"]
-margin_top = 24.0
+margin_top = 20.0
 margin_right = 276.0
-margin_bottom = 44.0
+margin_bottom = 40.0
 size_flags_horizontal = 3
+custom_constants/separation = 0
 
 [node name="View" type="Label" parent="Tree_inspector/Tree_data/Headers"]
 margin_top = 3.0
-margin_right = 66.0
+margin_right = 69.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 text = "View"
@@ -160,21 +164,21 @@ align = 1
 clip_text = true
 
 [node name="UCB_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 70.0
-margin_right = 136.0
+margin_left = 69.0
+margin_right = 138.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "UCB"
 
 [node name="Visits_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 140.0
-margin_right = 206.0
+margin_left = 138.0
+margin_right = 207.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Visits"
 
 [node name="Reward_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 210.0
+margin_left = 207.0
 margin_right = 276.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
@@ -200,41 +204,45 @@ margin_right = 371.0
 margin_bottom = 394.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
+custom_constants/vseparation = 0
+custom_constants/hseparation = 0
 
 [node name="Main_buttons" type="HBoxContainer" parent="Pop_inspector/Pop_data"]
 margin_right = 371.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
+custom_constants/separation = 0
 
 [node name="Update" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
-margin_right = 121.0
+margin_right = 123.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Update"
 
 [node name="Restart" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
-margin_left = 125.0
-margin_right = 246.0
+margin_left = 123.0
+margin_right = 247.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Restart pop"
 
 [node name="Use_EA" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
-margin_left = 250.0
+margin_left = 247.0
 margin_right = 371.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Use EA"
 
 [node name="Headers" type="HBoxContainer" parent="Pop_inspector/Pop_data"]
-margin_top = 24.0
+margin_top = 20.0
 margin_right = 371.0
-margin_bottom = 44.0
+margin_bottom = 40.0
 size_flags_horizontal = 3
+custom_constants/separation = 0
 
 [node name="View" type="Label" parent="Pop_inspector/Pop_data/Headers"]
 margin_top = 3.0
-margin_right = 52.0
+margin_right = 51.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 text = "View"
@@ -242,32 +250,32 @@ align = 1
 clip_text = true
 
 [node name="Age_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 56.0
-margin_right = 108.0
+margin_left = 51.0
+margin_right = 102.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Age"
 
 [node name="Visits_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 112.0
-margin_right = 164.0
+margin_left = 102.0
+margin_right = 153.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Visits"
 
 [node name="Reward_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 168.0
-margin_right = 221.0
+margin_left = 153.0
+margin_right = 211.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Rew"
+text = "Reward"
 
 [node name="Certainty_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 225.0
-margin_right = 294.0
+margin_left = 211.0
+margin_right = 298.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Certainty"
+text = "Significance"
 
 [node name="Deviation_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
 margin_left = 298.0
