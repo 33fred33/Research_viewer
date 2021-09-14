@@ -242,7 +242,7 @@ custom_constants/separation = 0
 
 [node name="View" type="Label" parent="Pop_inspector/Pop_data/Headers"]
 margin_top = 3.0
-margin_right = 51.0
+margin_right = 61.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 text = "View"
@@ -250,39 +250,39 @@ align = 1
 clip_text = true
 
 [node name="Age_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 51.0
-margin_right = 102.0
+margin_left = 61.0
+margin_right = 122.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Age"
 
 [node name="Visits_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 102.0
-margin_right = 153.0
+margin_left = 122.0
+margin_right = 183.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Visits"
 
-[node name="Reward_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 153.0
-margin_right = 211.0
+[node name="Fitness_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
+margin_left = 183.0
+margin_right = 244.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Reward"
+text = "Fitness"
 
 [node name="Certainty_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 211.0
-margin_right = 298.0
+margin_left = 244.0
+margin_right = 309.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Significance"
+text = "Updates"
 
 [node name="Deviation_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 298.0
+margin_left = 309.0
 margin_right = 371.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Deviation"
+text = "Deviat"
 
 [connection signal="button_down" from="MCTS_menu/Selection" to="." method="mcts_selection"]
 [connection signal="button_down" from="MCTS_menu/View_selection" to="." method="view_selected_node"]
@@ -299,3 +299,6 @@ text = "Deviation"
 [connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Reward_sort" to="." method="sort_node_table_reward"]
 [connection signal="button_down" from="Pop_inspector/Pop_data/Main_buttons/Update" to="." method="update_pop_table"]
 [connection signal="button_down" from="Pop_inspector/Pop_data/Main_buttons/Use_EA" to="." method="use_ea"]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Visits_sort" to="." method="sort_ind_table_visits"]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Fitness_sort" to="." method="sort_ind_table_fitness"]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Deviation_sort" to="." method="sort_ind_table_deviation"]
