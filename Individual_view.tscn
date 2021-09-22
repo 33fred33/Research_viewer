@@ -73,5 +73,6 @@ margin_right = 300.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 
+[connection signal="button_down" from="View_node" to="." method="on_view_matching_state"]
 [connection signal="mouse_entered" from="View_node" to="." method="on_mouse_hover"]
 [connection signal="mouse_exited" from="View_node" to="." method="on_mouse_exit"]

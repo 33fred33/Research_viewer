@@ -54,8 +54,8 @@ public class Main_control : Control
 		//base_state.set_initial_state(19, 19, 5); //freestyle gomoku
 		//base_state.set_initial_state(5, 5, 4); // draw
 		//base_state.set_initial_state(6, 6, 5); // draw
-		//base_state.set_initial_state(3, 3, 3); //draw tictactoe
-		base_state.set_initial_state(6, 5, 4); //is a win
+		base_state.set_initial_state(3, 3, 3); //draw tictactoe
+		//base_state.set_initial_state(6, 5, 4); //is a win
 		mnk_game_states.Add(base_state);
 		mcts = new MCTS(base_state);
 		
@@ -241,10 +241,10 @@ public class Main_control : Control
 			Label node_index_label = node_table_container.GetNode<Label>("Child_index");
 			int child_index = Convert.ToInt32(node_index_label.Text);
 			//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
-			try {sorted_nodes.Add(showing_node.children[child_index].reward , node_table_container);}
+			try {sorted_nodes.Add(showing_node.children[child_index].reward/showing_node.children[child_index].visits , node_table_container);}
 			catch
 			{
-				sorted_nodes.Add(showing_node.children[child_index].reward + safe_counter, node_table_container);
+				sorted_nodes.Add(showing_node.children[child_index].reward/showing_node.children[child_index].visits + safe_counter, node_table_container);
 				safe_counter += 0.00000000001;
 			}
 		}
@@ -274,8 +274,8 @@ public class Main_control : Control
 			{
 				max_ucb = child_node.Value.UCB(mcts.c);
 				min_ucb = child_node.Value.UCB(mcts.c);
-				max_reward = child_node.Value.reward;
-				min_reward = child_node.Value.reward;
+				max_reward = child_node.Value.reward/child_node.Value.visits;
+				min_reward = child_node.Value.reward/child_node.Value.visits;
 				max_visits = child_node.Value.visits;
 				min_visits = child_node.Value.visits;
 				first_time = false;
@@ -286,8 +286,8 @@ public class Main_control : Control
 				double child_ucb = child_node.Value.UCB(mcts.c);
 				if (child_ucb < min_ucb) min_ucb = child_ucb;
 				else if (child_ucb > max_ucb) max_ucb = child_ucb;
-				if (child_node.Value.reward < min_reward) min_reward = child_node.Value.reward;
-				else if (child_node.Value.reward > max_reward) max_reward = child_node.Value.reward;
+				if (child_node.Value.reward/child_node.Value.visits < min_reward) min_reward = child_node.Value.reward/child_node.Value.visits;
+				else if (child_node.Value.reward/child_node.Value.visits > max_reward) max_reward = child_node.Value.reward/child_node.Value.visits;
 				if (child_node.Value.visits < min_visits) min_visits = child_node.Value.visits;
 				else if (child_node.Value.visits > max_visits) max_visits = child_node.Value.visits;
 
@@ -331,7 +331,7 @@ public class Main_control : Control
 				Godot.ProgressBar reward_progress = node_row.GetNode<ProgressBar>("Rew_relative");
 				reward_progress.MinValue = min_reward;
 				reward_progress.MaxValue = max_reward;
-				reward_progress.Value = child_node.Value.reward;
+				reward_progress.Value = child_node.Value.reward/child_node.Value.visits;
 				Godot.ProgressBar visits_progress = node_row.GetNode<ProgressBar>("Visits_relative");
 				visits_progress.MinValue = min_visits;
 				visits_progress.MaxValue = max_visits;
@@ -348,6 +348,7 @@ public class Main_control : Control
 			Godot.HBoxContainer instance_ind_inspector = (HBoxContainer)ind_table.Instance();
 			instance_ind_inspector.Connect("view_individual", this, "view_postulant_individual");
 			instance_ind_inspector.Connect("exit_individual", this, "return_view_to_showing_node");
+			instance_ind_inspector.Connect("view_matching_state", this, "view_matching_state");
 			Label ind_index = (Label)instance_ind_inspector.GetNode<Label>("Individual_index");
 			ind_index.Text = Convert.ToString(ind.Key);
 			pop_data.AddChild(instance_ind_inspector);
@@ -419,6 +420,11 @@ public class Main_control : Control
 				}
 			else mnk_tilemap.SetCellv(temp_vec, 1);
 		}
+	}
+	public void view_matching_state(int individual_index)
+	{
+		view_mnk_state(mcts.postulant_population[individual_index].matching_state);
+		node_data.Text = "Stored matching state";
 	}
 	public void clear_view()
 	{
@@ -527,6 +533,7 @@ public class Main_control : Control
 	}
 }
 
+
 //----------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------
@@ -610,6 +617,11 @@ public class MCTS
 	public int active_pop_size;
 	public int postulant_pop_size;
 	public int individuals_count;
+	public int mutation_growth;
+	public int mutation_shrink;
+	public double mutation_rate;
+	public double elitism;
+	public int tournament_size;
 	public Dictionary<int,Pattern_individual> active_population = new Dictionary<int, Pattern_individual>();
 	public Dictionary<int,Pattern_individual> postulant_population = new Dictionary<int, Pattern_individual>();
 	public int max_initial_complexity;
@@ -626,9 +638,14 @@ public class MCTS
 				,double win_value = 1
 				,double draw_value = 0
 				,double lose_value = -1
-				,int active_pop_size = 100
+				,int active_pop_size = 50
 				,int postulant_pop_size = 100
-				,int max_initial_complexity = 4)
+				,int max_initial_complexity = 4
+				,double mutation_rate = 0.5
+				,double elitism = 0.5
+				,int mutation_growth = 2
+				,int mutation_shrink = 2
+				,int tournament_size = 5)
 	{
 		root_node = new MCTS_node(root_state, null, true);
 		this.c = c;
@@ -639,6 +656,11 @@ public class MCTS
 		this.active_pop_size = active_pop_size;
 		this.postulant_pop_size = postulant_pop_size;
 		this.max_initial_complexity = max_initial_complexity;
+		this.mutation_rate = mutation_rate;
+		this.elitism = elitism;
+		this.mutation_growth = mutation_growth;
+		this.mutation_shrink = mutation_shrink;
+		this.tournament_size = tournament_size;
 	}
 	public void iteration(int max_iterations = 1)
 	{
@@ -660,14 +682,16 @@ public class MCTS
 
 		while(iteration_count < max_iterations)
 		{
-			//gen_change();
+			
 			current_gen_unmatched_postulant_inds = postulant_population.Keys.ToList();
+
 			MCTS_node node = ea_UCT_policy(root_node);
 			node = random_expansion(node);
 			double reward = ea_simulation(node);
 			backpropagate(node, reward);
-			final_population_update(reward);
 
+			final_population_update(reward);
+			gen_change();
 			iteration_count++;
 		}
 	}
@@ -884,9 +908,15 @@ public class MCTS
 		}
 		return population;
 	}
-	public void initialize_population()
+	public void initialize_population() //temporal debugging setup
 	{
 		postulant_population = get_random_initial_population(root_node.state);
+		//postulant_population[0] = new_random_uniform_individual(root_node.state);
+		/*
+		for (int i=1; i<postulant_pop_size-1; i++)
+		{
+			postulant_population[i] = uniform_mutation(postulant_population[0], mutation_growth, mutation_shrink);
+		}*/
 	}
 	public double get_sd(List<double> someDoubles)
 	{
@@ -973,6 +1003,7 @@ public class MCTS
 		{
 			if (pattern_match(pop[index].pattern, state))
 			{
+				if (!state.terminal) pop[index].update_matching_state(state);
 				matching_indexes.Add(index);
 			}
 		}
@@ -1006,12 +1037,42 @@ public class MCTS
 			ind.Value.make_older();
 		}
 	}
+	public void gen_change()
+	{
+		Dictionary<int,Pattern_individual> new_pop = new Dictionary<int, Pattern_individual>();
+		List<int> ind_idx = postulant_population.Keys.ToList();
+		ind_idx.Sort((i1, i2) => postulant_population[i2].fitness().CompareTo(postulant_population[i1].fitness()));
+		int elites = Convert.ToInt32(postulant_pop_size*elitism);
+		for (int i=0; i<elites; i++)
+		{
+			new_pop[i] = postulant_population[ind_idx[i]];
+		}
+		for (int i=elites; i<postulant_pop_size; i++)
+		{
+			int selected_idx = ordered_tournament_selection(ind_idx, tournament_size);
+			new_pop[i] = uniform_mutation(postulant_population[selected_idx], mutation_growth, mutation_shrink);
+		}
+		postulant_population = new_pop;
+	}
+	public int ordered_tournament_selection(List<int> ordered_index_list, int t_size)
+	{
+		int temporal_idx;
+		int final_idx = 99999;
+		for (int i = 0; i<t_size; i++)
+		{
+			temporal_idx = rand.Next(ordered_index_list.Count);
+			if (temporal_idx < final_idx)
+			{
+				final_idx = temporal_idx;
+			}
+		}
+		return ordered_index_list[final_idx];
+	}
 	public Pattern_individual uniform_mutation(Pattern_individual ind, int growth, int shrink)
 	{
 		Dictionary<int, int> new_pattern = new Dictionary<int, int>();
 		List<int> new_keys = new List<int>();
 		int key_index;
-		int change = rand.Next(growth + shrink + 1) - shrink;
 
 		if (ind.pattern.Count == ind.matching_state.feature_vector.Count)
 		{
@@ -1021,6 +1082,8 @@ public class MCTS
 			}
 			return create_individual(new_pattern, ind.matching_state);
 		}
+
+		int change = rand.Next(growth + shrink + 1) - shrink;
 
 		//Building the list of available keys
 		List<int> available_keys = new List<int>();
@@ -1033,10 +1096,11 @@ public class MCTS
 		}
 
 		//Include previous
-		foreach (var feature in ind.pattern)
-		{
-			new_keys.Add(feature.Key);
-		}
+		new_keys = ind.pattern.Keys.ToList();
+		//foreach (var feature in ind.pattern)
+		//{
+		//	new_keys.Add(feature.Key);
+		//}
 
 		//According to change
 		if (change > 0)
@@ -1055,29 +1119,21 @@ public class MCTS
 		}
 		if (change == 0)
 		{
-			//Add key
+			//Add and remove random key
 			key_index = rand.Next(available_keys.Count);
+			int to_remove_key_index = rand.Next(new_keys.Count);
+			new_keys.Remove(new_keys[to_remove_key_index]);
 			new_keys.Add(available_keys[key_index]);
-			//Remove key
-			int other_key_index = rand.Next(new_keys.Count);
-			while (other_key_index == available_keys[key_index])
-			{
-				other_key_index = rand.Next(new_keys.Count);
-				if (new_keys.Count==1) 
-				{
-					GD.Print("This should not be reached: infinite loop in mutation");
-					break; //to avoid an infinite loop
-				}
-			}
-			new_keys.Remove(new_keys[key_index]);
 		}
+
+
 		if (change<0)
 		{
 			for (int i = 0; i < Math.Abs(change); i++)
 			{
+				if (new_keys.Count == 1) break;
 				key_index = rand.Next(new_keys.Count);
 				new_keys.RemoveAt(key_index);
-				if (new_keys.Count == 1) break;
 			}
 		}
 		foreach (int key in new_keys)
@@ -1116,7 +1172,7 @@ public class Pattern_individual
 	{
 		pattern = new_pattern;
 		this.origin_index = origin_index;
-		matching_state = state;
+		update_matching_state(state);
 	}
 	public void update_current_reward(double reward, int visits_)
 	{
@@ -1149,7 +1205,8 @@ public class Pattern_individual
 	}
 	public void update_matching_state(mnk_state state)
 	{
-		matching_state = state;
+		if (!state.terminal) matching_state = state.duplicate();
+		else GD.Print("Attempted to add a terminal state");
 	}
 	public void update_with_node(int rollouts, double backpropagating_reward)
 	{
@@ -1439,9 +1496,9 @@ public class mnk_state
 		while (!state.terminal)
 		{
 			state = state.imagine_action(rand.Next(0,state.available_actions.Count));
-			states.Add(state);
+			if (!state.terminal) states.Add(state);
 		}
-		return (states[rand.Next(0,states.Count-1)], state);//ignores terminal state
+		return (states[rand.Next(0,states.Count)], state);
 	}
 	public void make_random_action()
 	{
