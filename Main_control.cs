@@ -72,6 +72,9 @@ public class Main_control : Control
 		pop_inspector = (ScrollContainer)GetNode<ScrollContainer>("Pop_inspector");
 		tree_data = tree_inspector.GetNode<GridContainer>("Tree_data");
 		pop_data = pop_inspector.GetNode<GridContainer>("Pop_data");
+
+		view_node(mcts.root_node);
+
 		use_ea(); //this changes mcts
 	}
 	public override void _Process(float delta)
@@ -364,6 +367,7 @@ public class Main_control : Control
 	}
 	public void sort_ind_table_fitness()
 	{
+		//https://developerpublish.com/c-tips-and-tricks-17-sort-dictionary-by-its-value/
 		ind_table_list.Sort((i1, i2) => mcts.postulant_population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].fitness().CompareTo(mcts.postulant_population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].fitness()));
 		for (int i=0; i<ind_table_list.Count; i++)
 		{
@@ -435,7 +439,7 @@ public class Main_control : Control
 	}
 	public void mcts_selection()
 	{
-		selected_node = mcts.UCT_policy(mcts.root_node);
+		selected_node = mcts.ea_UCT_policy(mcts.root_node);
 	}
 	public void mcts_expansion()
 	{
@@ -452,8 +456,9 @@ public class Main_control : Control
 	}
 	public void mcts_simulation()
 	{
-		temporal_reward = mcts.simulation(expanded_node);
-		reward_label.Text = "Reward: " + Convert.ToString(temporal_reward);
+		temporal_reward = mcts.ea_simulation(expanded_node);
+		//update_pop_table();
+		//reward_label.Text = "Reward: " + Convert.ToString(temporal_reward);
 	}
 	public void mcts_backpropagation()
 	{
@@ -461,6 +466,16 @@ public class Main_control : Control
 	}
 	public void mcts_iterate()
 	{
+		//mcts.ea_iteration((int)N_iterations.Value);
+		//mcts_view_root_node();
+		/*
+		for (int i=0; i<N_iterations.Value; i++)
+		{
+			mcts_selection();
+			mcts_expansion();
+			mcts_simulation();
+			mcts_backpropagation();
+		}*/
 		mcts.ea_iteration((int)N_iterations.Value);
 		mcts_view_root_node();
 		update_pop_table();
@@ -645,10 +660,13 @@ public class MCTS
 
 		while(iteration_count < max_iterations)
 		{
-			MCTS_node node = UCT_policy(root_node);
+			//gen_change();
+			current_gen_unmatched_postulant_inds = postulant_population.Keys.ToList();
+			MCTS_node node = ea_UCT_policy(root_node);
 			node = random_expansion(node);
 			double reward = ea_simulation(node);
 			backpropagate(node, reward);
+			final_population_update(reward);
 
 			iteration_count++;
 		}
@@ -700,7 +718,7 @@ public class MCTS
 			node = node.parent;
 			//GD.Print("Node after backpropagation: ", node._str());
 		}
-		node.update_reward(0);
+		node.update_reward(new_reward);
 	}
 	public double simulation(MCTS_node node)
 	{
@@ -804,6 +822,7 @@ public class MCTS
 		}
 		return children_list;
 	}
+	//EA methods
 	public Dictionary<int, int> random_uniform_pattern(mnk_state state)
 	{
 		Dictionary<int, int> pattern = new Dictionary<int, int>();
@@ -838,13 +857,13 @@ public class MCTS
 	public Pattern_individual new_random_uniform_individual(mnk_state state)
 	{
 		var state_tuple = state.get_random_future_state();
-		Pattern_individual ind = create_individual(random_uniform_pattern(state_tuple.random_state));
+		Pattern_individual ind = create_individual(random_uniform_pattern(state_tuple.random_state), state_tuple.random_state);
 		ind.update_current_reward(result_to_reward(state_tuple.final_state),1);
 		return ind;
 	}
-	public Pattern_individual create_individual(Dictionary<int, int> pattern)
+	public Pattern_individual create_individual(Dictionary<int, int> pattern, mnk_state state)
 	{
-		Pattern_individual ind = new Pattern_individual(pattern, individuals_count);
+		Pattern_individual ind = new Pattern_individual(pattern, individuals_count, state);
 		individuals_count++;
 		return ind;
 	}
@@ -878,13 +897,23 @@ public class MCTS
 			return Math.Sqrt(sumOfSquaresOfDifferences / (someDoubles.Count-1));
 		}
 		else return 0;
-	}
-	public double ea_default_policy(MCTS_node node)
+	}	
+	public MCTS_node ea_UCT_policy(MCTS_node node)
 	{
-		//A random game is played. The matched individuals are updated with the average reward
+		while (!node.is_leaf())
+		{
+			node = select_UCB(node);
+			update_current_gen_postulants(node);
+		}
+		return node;
+	}
+	public double ea_default_policy(MCTS_node node, List<int> ppop_indexes)
+	{
+		//ppop_indexes is a list of indexes of the postulant individuals that are to be considered
+		//A random game is played from node. The matched individuals are updated with the reward
 		current_rollout_matched_postulant_inds.Clear();
 		current_rollout_unmatched_postulant_inds.Clear();
-		foreach (int index in current_gen_unmatched_postulant_inds) {current_rollout_unmatched_postulant_inds.Add(index);}
+		foreach (int index in ppop_indexes) {current_rollout_unmatched_postulant_inds.Add(index);}
 		
 		mnk_state state = node.state.duplicate();
 		while(!state.terminal)
@@ -897,6 +926,7 @@ public class MCTS
 				current_rollout_matched_postulant_inds.Add(key);
 			}
 		}
+		//GD.Print("Removed for rollout :", list_to_string(current_rollout_unmatched_postulant_inds));
 		foreach (int index in current_rollout_matched_postulant_inds)
 		{
 			postulant_population[index].update_current_reward(result_to_reward(state),1);
@@ -906,19 +936,12 @@ public class MCTS
 	public double ea_simulation(MCTS_node node)
 	{
 		collective_reward.Clear();
-		current_gen_unmatched_postulant_inds = postulant_population.Keys.ToList(); //will change
-
-		//update matches
-		temporal_ints = matching_indexes(node.state, postulant_population, current_gen_unmatched_postulant_inds);
-		foreach (int key in temporal_ints)
-		{
-			current_gen_unmatched_postulant_inds.Remove(key);
-		}
+		update_current_gen_postulants(node);
 
 		//get reward
 		for (int i =0; i<rollouts; i++)
 		{
-			collective_reward.Add(ea_default_policy(node));
+			collective_reward.Add(ea_default_policy(node, current_gen_unmatched_postulant_inds));
 		}
 
 		//update individuals
@@ -926,7 +949,22 @@ public class MCTS
 		{
 			ind.Value.update_for_current_gen(collective_reward.Average());
 		}
+		int fd = 0;
+		foreach (var ind in postulant_population)
+		{
+			if (ind.Value.visits == 1) fd++;
+		}
+		//GD.Print("Tested once:", fd);
 		return collective_reward.Sum()/rollouts;
+	}
+	public string list_to_string(List<int> l)
+	{
+		string str = "";
+		foreach (int i in l)
+		{
+			str += Convert.ToString(i)+",";
+		}
+		return str;
 	}
 	public List<int> matching_indexes(mnk_state state, Dictionary<int, Pattern_individual> pop, List<int> indexes_in_scope)
 	{
@@ -939,6 +977,114 @@ public class MCTS
 			}
 		}
 		return matching_indexes;
+	}
+	public void update_matching_nodes(MCTS_node node, Dictionary<int, Pattern_individual> pop, List<int> matching_indexes_)
+	{
+		foreach (int i in matching_indexes_)
+		{
+			pop[i].update_matching_node(node);
+		}
+	}
+	public void remove_current_unmatched_postulant(List<int> matching_indexes_)
+	{
+		foreach (int key in matching_indexes_)
+		{
+			current_gen_unmatched_postulant_inds.Remove(key);
+		}
+	}
+	public void update_current_gen_postulants(MCTS_node node)
+	{
+		List<int> matching_indexes_ = matching_indexes(node.state, postulant_population, current_gen_unmatched_postulant_inds);
+		update_matching_nodes(node, postulant_population, matching_indexes_);
+		remove_current_unmatched_postulant(matching_indexes_);
+	}
+	public void final_population_update(double reward)
+	{
+		foreach (var ind in postulant_population)
+		{
+			ind.Value.update_with_node(rollouts,reward);
+			ind.Value.make_older();
+		}
+	}
+	public Pattern_individual uniform_mutation(Pattern_individual ind, int growth, int shrink)
+	{
+		Dictionary<int, int> new_pattern = new Dictionary<int, int>();
+		List<int> new_keys = new List<int>();
+		int key_index;
+		int change = rand.Next(growth + shrink + 1) - shrink;
+
+		if (ind.pattern.Count == ind.matching_state.feature_vector.Count)
+		{
+			foreach (var feature in ind.pattern)
+			{
+				new_pattern[feature.Key] = feature.Value;
+			}
+			return create_individual(new_pattern, ind.matching_state);
+		}
+
+		//Building the list of available keys
+		List<int> available_keys = new List<int>();
+		foreach (var feature in ind.matching_state.feature_vector)
+		{
+			if (!ind.pattern.ContainsKey(feature.Key))
+			{
+				available_keys.Add(feature.Key);
+			}
+		}
+
+		//Include previous
+		foreach (var feature in ind.pattern)
+		{
+			new_keys.Add(feature.Key);
+		}
+
+		//According to change
+		if (change > 0)
+		{
+			if (ind.pattern.Count + change > ind.matching_state.feature_vector.Count) change = ind.matching_state.feature_vector.Count - ind.pattern.Count;
+			if (change != 0)
+			{
+				//Building the list of new keys
+				for (int i = 0; i < change; i++)
+				{
+					key_index = rand.Next(available_keys.Count);
+					new_keys.Add(available_keys[key_index]);
+					available_keys.Remove(available_keys[key_index]);
+				}
+			}
+		}
+		if (change == 0)
+		{
+			//Add key
+			key_index = rand.Next(available_keys.Count);
+			new_keys.Add(available_keys[key_index]);
+			//Remove key
+			int other_key_index = rand.Next(new_keys.Count);
+			while (other_key_index == available_keys[key_index])
+			{
+				other_key_index = rand.Next(new_keys.Count);
+				if (new_keys.Count==1) 
+				{
+					GD.Print("This should not be reached: infinite loop in mutation");
+					break; //to avoid an infinite loop
+				}
+			}
+			new_keys.Remove(new_keys[key_index]);
+		}
+		if (change<0)
+		{
+			for (int i = 0; i < Math.Abs(change); i++)
+			{
+				key_index = rand.Next(new_keys.Count);
+				new_keys.RemoveAt(key_index);
+				if (new_keys.Count == 1) break;
+			}
+		}
+		foreach (int key in new_keys)
+		{
+			new_pattern[key] = ind.matching_state.feature_vector[key];
+		}
+		return create_individual(new_pattern, ind.matching_state);
 	}
 }
 
@@ -955,23 +1101,27 @@ public class Pattern_individual
 	public double current_gen_deviation;
 	public double current_gen_reward = 0;
 	public int current_gen_visits = 0;
-	public bool current_gen_updated = false;
+	public bool current_gen_updated = false; //this is for rollouts
+	public bool to_update_in_backpropagation = false;
 	public int n_gen_updated = 0; //number of mcts iterations where the pattern has been found and updated
 	public double average_deviation = 0;
 	public Dictionary<int, int> pattern = new Dictionary<int, int>();
 	public int total_age = 0;
 	public int visits = 0;
 	public int origin_index;
+	public MCTS_node matching_node;
+	public mnk_state matching_state;
 	//public bool current_branch_already_matched = false;
-	public Pattern_individual(Dictionary<int, int> new_pattern, int origin_index)
+	public Pattern_individual(Dictionary<int, int> new_pattern, int origin_index, mnk_state state)
 	{
 		pattern = new_pattern;
 		this.origin_index = origin_index;
+		matching_state = state;
 	}
-	public void update_current_reward(double avg_reward, int visits)
+	public void update_current_reward(double reward, int visits_)
 	{
-		current_gen_visits += visits;
-		current_gen_reward += avg_reward;
+		current_gen_visits += visits_;
+		current_gen_reward += reward;
 		current_gen_updated = true;
 	}
 	public void update_for_current_gen(double reference_average_reward)
@@ -980,6 +1130,7 @@ public class Pattern_individual
 		{
 			//update variables
 			current_gen_deviation = current_gen_reward/current_gen_visits - reference_average_reward;
+			//GD.Print(origin_index, " - current_gen_deviation: ", current_gen_deviation, ", reference_average_reward: ", reference_average_reward);
 			average_deviation = (visits*average_deviation + current_gen_visits*current_gen_deviation)/(visits + current_gen_visits);
 			n_gen_updated += 1;
 			visits += current_gen_visits;
@@ -989,7 +1140,25 @@ public class Pattern_individual
 			current_gen_visits = 0;
 			current_gen_updated = false;
 		}
-		total_age ++;
+	}
+	public void update_matching_node(MCTS_node node)
+	{
+		to_update_in_backpropagation = true;
+		matching_node = node;
+		update_matching_state(node.state);
+	}
+	public void update_matching_state(mnk_state state)
+	{
+		matching_state = state;
+	}
+	public void update_with_node(int rollouts, double backpropagating_reward)
+	{
+		if (to_update_in_backpropagation)
+		{
+			update_current_reward(backpropagating_reward*rollouts, rollouts);
+			update_for_current_gen(matching_node.parent.reward/matching_node.parent.visits);
+			to_update_in_backpropagation = false;
+		}
 	}
 	public double combine_sd(double mean1, double mean2, double sd1, double sd2, int n1, int n2)
 	{
@@ -1001,6 +1170,11 @@ public class Pattern_individual
 	{
 		return Math.Abs(average_deviation);
 	}
+	public void make_older()
+	{
+		total_age ++;
+	}
+	
 }
 
 
@@ -1267,7 +1441,7 @@ public class mnk_state
 			state = state.imagine_action(rand.Next(0,state.available_actions.Count));
 			states.Add(state);
 		}
-		return (states[rand.Next(0,states.Count)], state);
+		return (states[rand.Next(0,states.Count-1)], state);//ignores terminal state
 	}
 	public void make_random_action()
 	{

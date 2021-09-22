@@ -67,10 +67,11 @@ align = 1
 
 [node name="Individual_index" type="Label" parent="."]
 visible = false
-margin_left = 300.0
+margin_left = 261.0
 margin_top = 3.0
 margin_right = 300.0
 margin_bottom = 17.0
+size_flags_horizontal = 3
 
 [connection signal="mouse_entered" from="View_node" to="." method="on_mouse_hover"]
 [connection signal="mouse_exited" from="View_node" to="." method="on_mouse_exit"]
