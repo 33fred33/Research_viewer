@@ -188,10 +188,10 @@ text = "Rew"
 anchor_left = 1.795
 anchor_right = 2.904
 anchor_bottom = 1.059
-margin_left = -49.9451
+margin_left = -49.9459
 margin_top = 28.0
-margin_right = -312.184
-margin_bottom = -182.689
+margin_right = -312.186
+margin_bottom = -30.6887
 rect_scale = Vector2( 0.995764, 1.00221 )
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -201,7 +201,7 @@ __meta__ = {
 
 [node name="Pop_data" type="GridContainer" parent="Pop_inspector"]
 margin_right = 371.0
-margin_bottom = 394.0
+margin_bottom = 546.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 custom_constants/vseparation = 0
