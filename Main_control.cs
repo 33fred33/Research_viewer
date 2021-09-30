@@ -53,9 +53,9 @@ public class Main_control : Control
 		//base_state.set_initial_state(13, 13, 5); //gomoku
 		//base_state.set_initial_state(19, 19, 5); //freestyle gomoku
 		//base_state.set_initial_state(5, 5, 4); // draw
-		base_state.set_initial_state(6, 6, 5); // draw
+		//base_state.set_initial_state(6, 6, 5); // draw
 		//base_state.set_initial_state(3, 3, 3); //draw tictactoe
-		//base_state.set_initial_state(6, 5, 4); //is a win
+		base_state.set_initial_state(6, 5, 4); //is a win
 		mnk_game_states.Add(base_state);
 		mcts = new MCTS(base_state);
 		
@@ -358,18 +358,19 @@ public class Main_control : Control
 				Label visits = (Label)instance_ind_inspector.GetNode<Label>("Visits");
 				visits.Text = ind.Value.visits.ToString("G5");
 				Label fitness = (Label)instance_ind_inspector.GetNode<Label>("Fitness");
-				fitness.Text = ind.Value.fitness(mcts.collective_visits(mcts.postulant_population),mcts.selection_c).ToString("G5");
+				fitness.Text = ind.Value.fitness(mcts.collective_average_visits(mcts.postulant_population),mcts.selection_c, mcts.root_node.average_reward()).ToString("G5");
 				Label significance = (Label)instance_ind_inspector.GetNode<Label>("Significance");
-				significance.Text = ind.Value.n_gen_updated.ToString("G5");
+				significance.Text = Math.Abs(ind.Value.average_reward-mcts.root_node.average_reward()).ToString("G5");
 				Label deviation = (Label)instance_ind_inspector.GetNode<Label>("Deviation");
-				deviation.Text = ind.Value.average_deviation.ToString("G5");
+				deviation.Text = ind.Value.average_deviation.ToString("G5"); 
 			}
 			sort_ind_table_fitness();
 		}
 	public void sort_ind_table_fitness()
 		{
 			//https://developerpublish.com/c-tips-and-tricks-17-sort-dictionary-by-its-value/
-			ind_table_list.Sort((i1, i2) => mcts.postulant_population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].fitness(mcts.collective_visits(mcts.postulant_population),mcts.selection_c).CompareTo(mcts.postulant_population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].fitness(mcts.collective_visits(mcts.postulant_population),mcts.selection_c)));
+			ind_table_list.Sort((i1, i2) => mcts.postulant_population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].fitness(mcts.collective_average_visits(mcts.postulant_population),mcts.selection_c, mcts.root_node.average_reward())
+											.CompareTo(mcts.postulant_population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].fitness(mcts.collective_average_visits(mcts.postulant_population),mcts.selection_c, mcts.root_node.average_reward())));
 			for (int i=0; i<ind_table_list.Count; i++)
 			{
 				pop_data.MoveChild(ind_table_list[i], ind_table_list.Count + 1 - i);
@@ -604,7 +605,10 @@ public class MCTS_node
 					+ ", Action_index " + Convert.ToString(action_index); 
 			return s;
 		}
-
+	public double average_reward()
+		{
+			return reward/visits;
+		}
 }
 
 public class MCTS
@@ -645,7 +649,7 @@ public class MCTS
 				,double draw_value = 0
 				,double lose_value = -1
 				//ea params
-				,double selection_c = 0.001
+				,double selection_c = 0.1
 				,int active_pop_size = 100
 				,int postulant_pop_size = 100
 				,int max_initial_complexity = 3
@@ -922,12 +926,10 @@ public class MCTS
 	public void initialize_population() //temporal debugging setup
 		{
 			postulant_population = get_random_initial_population(root_node.state);
-			//postulant_population[0] = new_random_uniform_individual(root_node.state);
-			/*
-			for (int i=1; i<postulant_pop_size-1; i++)
+			foreach (var ind in postulant_population)
 			{
-				postulant_population[i] = uniform_mutation(postulant_population[0], mutation_growth, mutation_shrink);
-			}*/
+				active_population[ind.Key] = ind.Value;
+			}
 		}
 	public double get_sd(List<double> someDoubles)
 		{
@@ -1044,40 +1046,58 @@ public class MCTS
 		{
 			foreach (var ind in postulant_population)
 			{
-				ind.Value.update_with_node(rollouts,reward);
+				ind.Value.update_with_node(rollouts,reward,root_node.state.player_turn);
 				ind.Value.make_older();
 			}
 		}
 	public void gen_change()
 		{
 			Dictionary<int,Pattern_individual> new_pop = new Dictionary<int, Pattern_individual>();
+			Dictionary<int,Pattern_individual> new_active_pop = new Dictionary<int, Pattern_individual>();
 			Pattern_individual temporal_ind;
 			List<int> ind_idx = postulant_population.Keys.ToList();
 
 			//Sort population from best to worst
-			ind_idx.Sort((i1, i2) => postulant_population[i2].fitness(collective_visits(postulant_population),selection_c).CompareTo(postulant_population[i1].fitness(collective_visits(postulant_population),selection_c)));
+			ind_idx.Sort((i1, i2) => postulant_population[i2].fitness(collective_average_visits(postulant_population),selection_c, root_node.average_reward())
+									.CompareTo(postulant_population[i1].fitness(collective_average_visits(postulant_population),selection_c, root_node.average_reward())));
 			
+			//Add elites
 			int elites = Convert.ToInt32(postulant_pop_size*elitism);
 			int added_inds_counter = 0;
 			for (int i=0; i<elites; i++)
 			{
-				if (!is_duplicated(postulant_population[ind_idx[added_inds_counter]],new_pop)) 
+				temporal_ind = postulant_population[ind_idx[added_inds_counter]];
+				(bool matched, Pattern_individual matched_individual) = is_duplicated(temporal_ind, new_pop);
+				if (matched) 
 				{
-					new_pop[added_inds_counter] = postulant_population[ind_idx[added_inds_counter]];
+					if (matched_individual.visits < temporal_ind.visits)
+					{
+						new_pop.Remove(matched_individual.origin_index);
+						new_pop[temporal_ind.origin_index] = temporal_ind;
+						new_active_pop[temporal_ind.origin_index] = temporal_ind;
+					}
+					else i--;
 				}
-				else i--;
+				else
+				{
+					new_pop[temporal_ind.origin_index] = temporal_ind;
+					new_active_pop[temporal_ind.origin_index] = temporal_ind;
+				}
 				added_inds_counter++;
 				if (added_inds_counter == postulant_population.Count) break;
 			}
+
+			//Create offsprings
 			for (int i=new_pop.Count; i<postulant_pop_size; i++)
 			{
 				int selected_idx = ordered_tournament_selection(ind_idx, tournament_size);
 				temporal_ind = uniform_mutation(postulant_population[selected_idx], mutation_growth, mutation_shrink);
-				//if (!is_duplicated(temporal_ind, postulant_population)) new_pop[i] = temporal_ind;
-				//else temporal_ind = uniform_mutation(postulant_population[selected_idx], mutation_growth, mutation_shrink);
-				new_pop[i] = temporal_ind;
+				new_pop[temporal_ind.origin_index] = temporal_ind;
 			}
+
+			//Final assignation
 			postulant_population = new_pop;
+			active_population = new_active_pop;
 		}
 	public int ordered_tournament_selection(List<int> ordered_index_list, int t_size)
 		{
@@ -1093,9 +1113,9 @@ public class MCTS
 			}
 			return ordered_index_list[final_idx];
 		}
-	public int collective_visits(Dictionary<int, Pattern_individual> pop)
+	public double collective_visits(Dictionary<int, Pattern_individual> pop)
 		{
-			int total_visits = 0;
+			double total_visits = 0;
 			foreach (var ind in pop) 
 			{
 				total_visits += ind.Value.visits;
@@ -1111,16 +1131,16 @@ public class MCTS
 			}
 			return total_visits;
 		}
-	public bool is_duplicated(Pattern_individual ind, Dictionary<int, Pattern_individual> pop)
+	public (bool matched, Pattern_individual matched_ind) is_duplicated(Pattern_individual ind, Dictionary<int, Pattern_individual> pop)
 		{
 			foreach (var ind2 in pop)
 			{
 				if (same_dict(ind.pattern, ind2.Value.pattern))
 				{
-					return true;
+					return (true, ind2.Value);
 				}
 			}
-			return false;
+			return (false, ind);
 		}
 	public bool same_dict(Dictionary<int, int> p1, Dictionary<int, int> p2)
 		{
@@ -1258,14 +1278,14 @@ public class MCTS
 		}
 
 
-	public double ea_value_estimation(MCTS_node node, Dictionary<int, Pattern_individual> pop)
+	/*public double ea_value_estimation(MCTS_node node, Dictionary<int, Pattern_individual> pop)
 	{
 		double estimated_pattern_value = 0;
 		foreach(var ind in pop)
 		{
-			
+
 		}
-	}
+	}*/
 }
 
 //EA
@@ -1280,14 +1300,16 @@ public class MCTS
 public class Pattern_individual
 {
 	//variables
+		public double average_reward = 0;
 		public double current_gen_deviation;
 		public double current_gen_reward = 0;
 		public int current_gen_visits = 0;
-		public bool current_gen_match_in_rollouts = false; //this is for rollouts, in the current generation
+		public bool current_gen_reward_updated = false; //this is for rollouts, in the current generation
 		public bool current_gen_match_in_nodes = false; //when found during selection or expansion
 		public bool current_gen_updated_matching_state = false; //first time a match is found in the current gen
 		public int n_gen_updated = 0; //number of mcts iterations where the pattern has been found and updated
 		public double average_deviation = 0;
+		public double average_root_deviation;
 		public Dictionary<int, int> pattern = new Dictionary<int, int>();
 		public int total_age = 0;
 		public int visits = 0;
@@ -1301,27 +1323,28 @@ public class Pattern_individual
 			this.origin_index = origin_index;
 			update_matching_state(state);
 		}
-	public void update_current_reward(double reward, int visits_)
+	public void update_current_reward(double cumulative_reward, int visits_)
 		{
 			current_gen_visits += visits_;
-			current_gen_reward += reward;
-			current_gen_match_in_rollouts = true;
+			current_gen_reward += cumulative_reward;
+			current_gen_reward_updated = true;
 		}
 	public void update_for_current_gen(double reference_average_reward)
 		{
-			if (current_gen_match_in_rollouts)
+			if (current_gen_reward_updated)
 			{
 				//update variables
+				average_reward = (visits*average_reward + current_gen_reward)/(visits + current_gen_visits);
+
 				current_gen_deviation = current_gen_reward/current_gen_visits - reference_average_reward;
-				//GD.Print(origin_index, " - current_gen_deviation: ", current_gen_deviation, ", reference_average_reward: ", reference_average_reward);
 				average_deviation = (visits*average_deviation + current_gen_visits*current_gen_deviation)/(visits + current_gen_visits);
 				visits += current_gen_visits;
+				n_gen_updated += 1;
 			}
-			if (current_gen_updated_matching_state) n_gen_updated += 1;
 			//reset variables
 			current_gen_reward = 0;
 			current_gen_visits = 0;
-			current_gen_match_in_rollouts = false;
+			current_gen_reward_updated = false;
 			current_gen_updated_matching_state = false;
 		}
 	public void update_matching_node(MCTS_node node)
@@ -1339,12 +1362,13 @@ public class Pattern_individual
 			//else GD.Print("Attempted to add a terminal state");
 			current_gen_updated_matching_state = true;
 		}
-	public void update_with_node(int rollouts, double backpropagating_reward)
+	public void update_with_node(int rollouts, double backpropagating_reward, int perspective_player_turn)
 		{
 			if (current_gen_match_in_nodes)
 			{
 				update_current_reward(backpropagating_reward*rollouts, rollouts);
-				update_for_current_gen(matching_node.parent.reward/matching_node.parent.visits);
+				if (matching_node.parent.state.player_turn == perspective_player_turn) update_for_current_gen(matching_node.parent.average_reward());
+				else update_for_current_gen(-matching_node.parent.average_reward());
 				current_gen_match_in_nodes = false;
 			}
 		}
@@ -1354,23 +1378,34 @@ public class Pattern_individual
 			return ((n1-1)*sd1 + (n2-1)*sd2)/(n1+n2-1) + (n1*n2*Math.Pow(mean1-mean2,2))/(n1*n2*(n1+n2-1));
 
 		}
-	public double fitness(int collective_visits, double selection_c)
+	public double fitness(double collective_visits, double selection_c, double root_reward)
 		{
 			//return Math.Abs(average_deviation);
-			if (visits > 10) return Math.Abs(average_deviation) + selection_c * Math.Sqrt(Math.Log(collective_visits) / visits);
+			//if (visits > 0) return Math.Abs(average_deviation) + selection_c * Math.Sqrt(Math.Log(collective_visits) / visits);
+			//else return -double.PositiveInfinity;
+			//return Math.Abs(average_deviation)*(visits/(total_age+1));
+			//return Math.Abs(root_reward-average_reward)*(visits/(total_age+1));
+			//return Math.Abs(average_reward);
+			if (average_visits() > 0) return Math.Abs(root_reward-average_reward) + selection_c * Math.Sqrt(Math.Log(collective_visits) / average_visits());
+			//return Math.Abs(root_reward-average_reward) * Math.Log(selection_c * visits);
 			else return -double.PositiveInfinity;
-		}
+			//return Math.Abs(root_reward-average_reward)
+		} 
 	public void make_older()
 		{
 			total_age ++;
 		}
 	public double average_visits()
 		{
-			return visits/total_age;
+			return visits/(total_age+1);
+		}
+	public void _update_average_reward(double sample_average_reward, int sample_size)
+		{
+			
 		}
 }
 
-public class 
+//public class 
 //MNK GAME
 	//----------------------------------------------------------------------------------------------------------
 	//----------------------------------------------------------------------------------------------------------

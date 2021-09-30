@@ -242,7 +242,7 @@ custom_constants/separation = 0
 
 [node name="View" type="Label" parent="Pop_inspector/Pop_data/Headers"]
 margin_top = 3.0
-margin_right = 61.0
+margin_right = 60.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 text = "View"
@@ -250,35 +250,35 @@ align = 1
 clip_text = true
 
 [node name="Age_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 61.0
-margin_right = 122.0
+margin_left = 60.0
+margin_right = 120.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Age"
 
 [node name="Visits_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 122.0
-margin_right = 183.0
+margin_left = 120.0
+margin_right = 180.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Visits"
 
 [node name="Fitness_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 183.0
-margin_right = 244.0
+margin_left = 180.0
+margin_right = 240.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Fitness"
 
 [node name="Certainty_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 244.0
-margin_right = 309.0
+margin_left = 240.0
+margin_right = 310.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Updates"
+text = "Root_dev"
 
 [node name="Deviation_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 309.0
+margin_left = 310.0
 margin_right = 371.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
