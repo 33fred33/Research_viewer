@@ -6,12 +6,6 @@ using System.Linq;
 
 public class MCTS_lib : Control
 {
-	
-	// Declare member variables here. Examples:
-	// private int a = 2;
-	// private string b = "text";
-
-	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
 		/*
@@ -29,19 +23,12 @@ public class MCTS_lib : Control
 		//test_state.make_action(test_action_index);
 	}
 
-//  // Called every frame. 'delta' is the elapsed time since the previous frame.
-//  public override void _Process(float delta)
-//  {
-//      
-//  }
-
+//  public override void _Process(float delta){ }
 	public void test_method()
 	{
 		GD.Print("Test method reached");
 	}
 }
-
-
 
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
@@ -56,38 +43,188 @@ public interface IAgent
 	IGameState root_state {get; set;}
 	int best_action(IGameState root_state);
 }
-
+/*
 public interface ITreeAgent : IAgent
 {
+	void set_root(IGameState root_state);
 	MCTSNode selection(MCTSNode node);
 	MCTSNode expansion(MCTSNode node);
 	double rollout(MCTSNode node, int sim_rollouts);
 	void backpropagate(MCTSNode node, double total_reward, int sim_rollouts);
-}
-
-public class AgentMCTS : IAgent
+	void simulation();
+	int recommendation_policy();
+	double UCB(MCTSNode node);
+	MCTSNode root_node {get; set;}
+	int rollouts {get; set;}
+}*/
+public class RandomAgent : IAgent
 {
-public Random rand { get; set;}
-public IGameState root_state {get; set;}
+	public Random rand {get; set;}
+	public IGameState root_state {get; set;}
+	public RandomAgent(Random fixed_rand = null)
+	{
+		if (fixed_rand == null) rand = new Random();
+		else rand = fixed_rand;
+	}
+
 	public int best_action(IGameState root_state)
 	{
-		if (root_state.available_actions.Count > 0) return rand.Next(root_state.available_actions.Count);
-		else return 0;
+		this.root_state = root_state;
+		return rand.Next(root_state.available_actions.Count);
 	}
 }
-
-public class AgentEAMCTS : IAgent, ITreeAgent
+public class AgentMCTS : IAgent
 {
-	public MCTSNode root_node, expanded_node, selected_node;
+	public MCTSNode root_node {get; set;}
+	public MCTSNode expanded_node, selected_node;
 	public IGameState root_state {get; set;}
-	public int rollouts, active_pop_size, postulant_pop_size, individuals_count, mutation_growth, mutation_shrink, tournament_size, max_complexity, max_initial_complexity, random_shrink, random_growth, simulation_count, simulation_time;
-	public double stop_condition_value, c, win_value, draw_value, lose_value, selection_c, mutation_rate, elitism, cumulative_reward;
+	public int simulation_count, simulation_time;
+	public double stop_condition_value, c, win_value, draw_value, lose_value, cumulative_reward;
 	public string stop_condition;
+	public int rollouts {get; set;}
+	public Random rand { get; set;}
+	public AgentMCTS(Random fixed_rand = null
+				,double c = 2
+				,int rollouts = 100
+				,double win_value = 1
+				,double draw_value = 0
+				,double lose_value = -1
+				,string stop_condition = "iterations" //time, iterations
+				,double stop_condition_value = 1000) //time in milliseconds5)
+		{
+			if (fixed_rand == null) rand = new Random();
+			else rand = fixed_rand;
+			this.root_state = root_state;
+			this.c = c;
+			this.rollouts = rollouts;
+			this.win_value = win_value;
+			this.draw_value = draw_value;
+			this.lose_value = lose_value;
+			this.stop_condition = stop_condition;
+			this.stop_condition_value = stop_condition_value;
+		}
+
+	public virtual void set_root(IGameState root_state)
+	{
+		root_node = new MCTSNode(root_state,null,true);
+	}
+	public virtual int best_action(IGameState root_state)
+	{
+		set_root(root_state);
+		simulation_count = 0;
+		simulation_time = 0;
+		DateTime start_time = DateTime.UtcNow;           	
+
+		while ((stop_condition == "iterations" && simulation_count < stop_condition_value)||(stop_condition == "time" && simulation_time < stop_condition_value))
+		{
+			simulation();
+			simulation_count++;
+			simulation_time = Convert.ToInt32((DateTime.UtcNow - start_time).TotalMilliseconds);
+		}
+		return recommendation_policy();
+	}
+	public virtual int recommendation_policy()
+	{
+		//Robust action: max visits
+		int max_key = 0;
+		double max_value = 0;
+		foreach (var child_node in root_node.children)
+		{
+			if (child_node.Value.visits > max_value)
+			{
+				max_value = child_node.Value.visits;
+				max_key = child_node.Key;
+			}
+		}
+		return root_node.children[max_key].action_index;
+	}
+	public virtual void simulation()
+	{
+		selected_node = selection(root_node);
+		expanded_node = expansion(selected_node);
+		cumulative_reward = rollout(expanded_node, rollouts);
+		backpropagate(expanded_node, cumulative_reward, rollouts);
+	}
+	public virtual MCTSNode selection(MCTSNode node)
+	{
+		while (!node.is_leaf())
+		{
+			node = select_UCB(node);
+		}
+		return node;
+	}
+	public virtual MCTSNode select_UCB(MCTSNode node)
+		{
+
+			int max_key = 0;
+			double max_value = 0;
+			double max_UCB_value;
+
+			foreach (var child_node in node.children)
+			{
+				max_UCB_value = UCB(child_node.Value);
+				if (max_UCB_value > max_value)
+				{
+					max_value = max_UCB_value;
+					max_key = child_node.Key;
+				}
+			}
+			return node.children[max_key];
+		}
+	public virtual MCTSNode expansion(MCTSNode node)
+	{
+		if (node.state.terminal) return node;
+		var duplicate_state = node.state.duplicate();
+		List<int> available_action_indexes = new List<int>();
+		for (int i = 0; i < node.state.available_actions.Count; i++) available_action_indexes.Add(i);
+		foreach (int i in node.children.Keys) available_action_indexes.Remove(i);
+		int selection_index = rand.Next(available_action_indexes.Count);
+		int action_index = available_action_indexes[selection_index];
+		duplicate_state.make_action(action_index);
+		return node.add_child(duplicate_state, action_index);
+	}
+	public virtual double rollout(MCTSNode node, int sim_rollouts)
+	{
+		if(node.state.terminal) return result_to_reward(node.state);
+		double reward =0;
+		for (int i =0; i<sim_rollouts; i++)
+		{
+			reward += result_to_reward(node.state.random_game());
+		}
+		return reward;
+	}
+	public virtual void backpropagate(MCTSNode node, double total_reward, int sim_rollouts)
+	{
+		double average_reward = total_reward/sim_rollouts;
+		while (!node.is_root)
+		{
+			if (node.state.player_turn == root_node.state.player_turn) node.update_reward(-average_reward);
+			else node.update_reward(average_reward);
+			node = node.parent;
+		}
+		node.update_reward(average_reward);
+	}
+	//Utilities
+	public double result_to_reward(IGameState final_state)
+		{
+			if (final_state.winner == root_node.state.player_turn) return win_value;
+			if (final_state.winner == root_node.state.swap_player(root_node.state.player_turn)) return lose_value;
+			return draw_value;
+		}
+	public double UCB(MCTSNode node)
+		{
+			if (node.visits > 0) return node.average_reward() + c * Math.Sqrt(Math.Log(node.parent.visits) / node.visits);
+			else return double.PositiveInfinity;
+		}
+
+}
+public class AgentEPAMCTS : AgentMCTS
+{
+	public int active_pop_size, postulant_pop_size, individuals_count, mutation_growth, mutation_shrink, tournament_size, max_complexity, max_initial_complexity, random_shrink, random_growth;
+	public double mutation_rate, elitism;
 	public Dictionary<int,Pattern> active_population = new Dictionary<int, Pattern>();
 	public Dictionary<int,Pattern> postulant_population = new Dictionary<int, Pattern>();
-	public Random rand { get; set;}
-	public AgentEAMCTS(IGameState root_state
-				,Random fixed_rand = null
+	public AgentEPAMCTS(Random fixed_rand = null
 				,double c = 2
 				,int rollouts = 100
 				,double win_value = 1
@@ -107,7 +244,6 @@ public class AgentEAMCTS : IAgent, ITreeAgent
 				,int mutation_shrink = 2
 				,int tournament_size = 5)
 		{
-			root_node = new MCTSNode(root_state, null, true);
 			if (fixed_rand == null) rand = new Random();
 			else rand = fixed_rand;
 			this.root_state = root_state;
@@ -116,7 +252,6 @@ public class AgentEAMCTS : IAgent, ITreeAgent
 			this.win_value = win_value;
 			this.draw_value = draw_value;
 			this.lose_value = lose_value;
-			this.selection_c = selection_c;
 			this.active_pop_size = active_pop_size;
 			this.postulant_pop_size = postulant_pop_size;
 			this.max_initial_complexity = max_initial_complexity;
@@ -129,104 +264,44 @@ public class AgentEAMCTS : IAgent, ITreeAgent
 			this.stop_condition = stop_condition;
 			this.stop_condition_value = stop_condition_value;
 		}
-
-	public int best_action(IGameState root_state)
-	{
-		root_node = new MCTSNode(root_state,null,true);
-		simulation_count = 0;
-		simulation_time = 0;
-		DateTime start_time = DateTime.UtcNow;           	
-
-		while ((stop_condition == "iterations" && simulation_count < stop_condition_value)||(stop_condition == "time" && simulation_time < stop_condition_value))
+		public Dictionary<int, int> random_uniform_pattern(IGameState state)
 		{
-			simulation(rollouts);
-			simulation_count++;
-			simulation_time = Convert.ToInt32((DateTime.UtcNow - start_time).TotalMilliseconds);
-		}
-		return 0;
-	}
-	public void simulation(int sim_rollouts)
-	{
-		MCTSNode selected_node = selection(root_node);
-		expanded_node = expansion(selected_node);
-		cumulative_reward = rollout(expanded_node, sim_rollouts);
-		backpropagate(expanded_node, cumulative_reward, sim_rollouts);
-	}
-	public MCTSNode selection(MCTSNode node)
-	{
-		while (!node.is_leaf())
-		{
-			node = select_UCB(node);
-		}
-		return node;
-	}
-	public MCTSNode select_UCB(MCTSNode node)
-		{
-
-			int max_key = 0;
-			double max_value = 0;
-			double max_UCB_value;
-
-			foreach (var child_node in node.children)
+			Dictionary<int, int> pattern = new Dictionary<int, int>();
+			int size = rand.Next(1, max_initial_complexity+1);
+			int new_key;
+			List<int> keys = new List<int>();
+			while (keys.Count < size)
 			{
-				max_UCB_value = child_node.Value.UCB(c);
-				if (max_UCB_value > max_value)
+				new_key = rand.Next(state.feature_vector.Count);
+				if (!keys.Contains(new_key))
 				{
-					max_value = max_UCB_value;
-					max_key = child_node.Key;
+					keys.Add(new_key);
 				}
 			}
-			return node.children[max_key];
+			foreach (int key in keys)
+			{
+				pattern[key] = state.feature_vector[key];
+			}
+			return pattern;
 		}
-	public MCTSNode expansion(MCTSNode node)
-	{
-		if (node.state.terminal) return node;
-		var duplicate_state = node.state.duplicate();
-		List<int> available_action_indexes = new List<int>();
-		for (int i = 0; i < node.state.available_actions.Count; i++) available_action_indexes.Add(i);
-		foreach (int i in node.children.Keys) available_action_indexes.Remove(i);
-		int selection_index = rand.Next(available_action_indexes.Count);
-		int action_index = available_action_indexes[selection_index];
-		duplicate_state.make_action(action_index);
-		return node.add_child(duplicate_state, action_index);
-	}
-	public double rollout(MCTSNode node, int sim_rollouts)
-	{
-		if(node.state.terminal) return result_to_reward(node.state);
-		double reward =0;
-		for (int i =0; i<sim_rollouts; i++)
+		public Pattern new_random_uniform_individual(IGameState state)
 		{
-			reward += result_to_reward(node.state.random_game());
+			var state_tuple = state.get_random_future_state();
+			Pattern ind = create_individual(random_uniform_pattern(state_tuple.random_state), state_tuple.random_state);
+			ind.update_current_reward(result_to_reward(state_tuple.final_state),1);
+			return ind;
 		}
-		return reward;
-	
-	}
-	public void backpropagate(MCTSNode node, double total_reward, int sim_rollouts)
-	{
-		double average_reward = total_reward/sim_rollouts;
-		while (!node.is_root)
+		public Pattern create_individual(Dictionary<int, int> pattern, IGameState state)
 		{
-			if (node.state.player_turn == root_node.state.player_turn) node.update_reward(-average_reward);
-			else node.update_reward(average_reward);
-			node = node.parent;
+			Pattern ind = new Pattern(pattern, individuals_count, state);
+			individuals_count++;
+			return ind;
 		}
-		node.update_reward(average_reward);
-	}
-	//Utilities
-	public double result_to_reward(IGameState final_state)
-		{
-			if (final_state.winner == root_node.state.player_turn) return win_value;
-			if (final_state.winner == root_node.state.swap_player(root_node.state.player_turn)) return lose_value;
-			return draw_value;
-		}
-
 }
-
 public class MCTSNode
 {
 	//variables
-		public int action_index;
-		public int visits;
+		public int action_index, visits;
 		public int max_tested_index = 0;
 		public IGameState state;
 		public MCTSNode parent;
@@ -245,11 +320,6 @@ public class MCTSNode
 	public bool is_leaf()
 		{
 			return (children.Count == 0 || state.available_actions.Count > children.Count);
-		}
-	public double UCB(double c)
-		{
-			if (visits > 0) return reward / visits + c * Math.Sqrt(Math.Log(parent.visits) / visits);
-			else return double.PositiveInfinity;
 		}
 	public MCTSNode add_child(IGameState child_state, int action_index)
 		{
@@ -276,11 +346,11 @@ public class MCTSNode
 	public string _str()
 		{
 			string s = "Node. Depth " + Convert.ToString(depth()) 
+					+ ", Action_index " + Convert.ToString(action_index)
 					+ ", Visits " + Convert.ToString(visits) 
-					+ ", AvgReward " + Convert.ToString(reward/visits) 
-					+ ", AvActions " + Convert.ToString(state.available_actions.Count)
-					+ ", Children " + Convert.ToString(children.Count)
-					+ ", Action_index " + Convert.ToString(action_index); 
+					+ ", AvgReward " + Convert.ToString(average_reward()) 
+					+ ", Actions " + Convert.ToString(state.available_actions.Count)
+					+ ", Children " + Convert.ToString(children.Count); 
 			return s;
 		}
 	public double average_reward()
@@ -316,8 +386,14 @@ public class Pattern
 			this.index = index;
 			this.matching_state = state;
 		}
+	public void update_current_reward(double total_reward, int visits)
+	{
+		cumulative_reward += total_reward;
+		this.visits += visits;
+	}
 
 }
+
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
