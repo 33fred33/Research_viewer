@@ -12,6 +12,10 @@ script = ExtResource( 2 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
+random_seed = 1
+board_size_m = 13
+board_size_n = 13
+line_length_k = 5
 mnk_tileset = ExtResource( 1 )
 
 [node name="MCTS_menu" type="GridContainer" parent="."]
@@ -94,27 +98,65 @@ allow_greater = true
 tick_count = 10
 ticks_on_borders = true
 
-[node name="See_suggested" type="Button" parent="MCTS_menu"]
+[node name="Iterate_time" type="Button" parent="MCTS_menu"]
 margin_top = 120.0
 margin_right = 117.0
 margin_bottom = 140.0
-text = "See_suggested"
+text = "Time"
 
-[node name="See_parent" type="Button" parent="MCTS_menu"]
+[node name="N_time" type="HSlider" parent="MCTS_menu"]
 margin_left = 121.0
 margin_top = 120.0
 margin_right = 265.0
-margin_bottom = 140.0
+margin_bottom = 136.0
+min_value = 1000.0
+max_value = 100000.0
+step = 1000.0
+value = 1000.0
+allow_greater = true
+tick_count = 10
+ticks_on_borders = true
+
+[node name="See_suggested" type="Button" parent="MCTS_menu"]
+margin_top = 144.0
+margin_right = 117.0
+margin_bottom = 164.0
+text = "See suggested"
+
+[node name="See_parent" type="Button" parent="MCTS_menu"]
+margin_left = 121.0
+margin_top = 144.0
+margin_right = 265.0
+margin_bottom = 164.0
 text = "See parent"
+
+[node name="Play_suggested" type="Button" parent="MCTS_menu"]
+margin_top = 168.0
+margin_right = 117.0
+margin_bottom = 188.0
+text = "Play suggested"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Takeback" type="Button" parent="MCTS_menu"]
+margin_left = 121.0
+margin_top = 168.0
+margin_right = 265.0
+margin_bottom = 188.0
+text = "Takeback"
+__meta__ = {
+"_edit_use_anchors_": false
+}
 
 [node name="Tree_inspector" type="ScrollContainer" parent="."]
 anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-margin_left = 109.0
-margin_top = 180.0
-margin_right = 385.0
-margin_bottom = 9.00012
+margin_left = 108.999
+margin_top = 246.0
+margin_right = 384.999
+margin_bottom = 9.00031
 rect_scale = Vector2( 0.995764, 1.00221 )
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -124,7 +166,7 @@ __meta__ = {
 
 [node name="Tree_data" type="GridContainer" parent="Tree_inspector"]
 margin_right = 276.0
-margin_bottom = 400.0
+margin_bottom = 334.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 custom_constants/vseparation = 0
@@ -208,7 +250,7 @@ custom_constants/vseparation = 0
 custom_constants/hseparation = 0
 
 [node name="Main_buttons" type="HBoxContainer" parent="Pop_inspector/Pop_data"]
-margin_right = 371.0
+margin_right = 370.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 custom_constants/separation = 0
@@ -221,21 +263,21 @@ text = "Update"
 
 [node name="Restart" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
 margin_left = 123.0
-margin_right = 247.0
+margin_right = 246.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Restart pop"
 
 [node name="Use_EA" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
-margin_left = 247.0
-margin_right = 371.0
+margin_left = 246.0
+margin_right = 370.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Use EA"
 
 [node name="Headers" type="HBoxContainer" parent="Pop_inspector/Pop_data"]
 margin_top = 20.0
-margin_right = 371.0
+margin_right = 370.0
 margin_bottom = 40.0
 size_flags_horizontal = 3
 custom_constants/separation = 0
@@ -279,7 +321,7 @@ text = "Root_dev"
 
 [node name="Deviation_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
 margin_left = 310.0
-margin_right = 371.0
+margin_right = 370.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Deviat"
@@ -292,6 +334,7 @@ text = "Deviat"
 [connection signal="button_down" from="MCTS_menu/Backpropagation" to="." method="mcts_backpropagation"]
 [connection signal="button_down" from="MCTS_menu/View_root" to="." method="mcts_view_root_node"]
 [connection signal="button_down" from="MCTS_menu/Iterate" to="." method="mcts_iterate"]
+[connection signal="button_down" from="MCTS_menu/Iterate_time" to="." method="mcts_iterate"]
 [connection signal="button_down" from="MCTS_menu/See_suggested" to="." method="see_suggested_move"]
 [connection signal="button_down" from="MCTS_menu/See_parent" to="." method="see_parent"]
 [connection signal="button_down" from="Tree_inspector/Tree_data/Headers/UCB_sort" to="." method="sort_node_table_ucb"]

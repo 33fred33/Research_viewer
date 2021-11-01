@@ -41,22 +41,10 @@ public interface IAgent
 {
 	Random rand {get; set;}
 	IGameState root_state {get; set;}
-	int best_action(IGameState root_state);
+	int predict();
+	void fit(IGameState root_state);
 }
-/*
-public interface ITreeAgent : IAgent
-{
-	void set_root(IGameState root_state);
-	MCTSNode selection(MCTSNode node);
-	MCTSNode expansion(MCTSNode node);
-	double rollout(MCTSNode node, int sim_rollouts);
-	void backpropagate(MCTSNode node, double total_reward, int sim_rollouts);
-	void simulation();
-	int recommendation_policy();
-	double UCB(MCTSNode node);
-	MCTSNode root_node {get; set;}
-	int rollouts {get; set;}
-}*/
+
 public class RandomAgent : IAgent
 {
 	public Random rand {get; set;}
@@ -66,10 +54,12 @@ public class RandomAgent : IAgent
 		if (fixed_rand == null) rand = new Random();
 		else rand = fixed_rand;
 	}
-
-	public int best_action(IGameState root_state)
+	public void fit(IGameState root_state)
 	{
 		this.root_state = root_state;
+	}
+	public int predict()
+	{
 		return rand.Next(root_state.available_actions.Count);
 	}
 }
@@ -104,13 +94,12 @@ public class AgentMCTS : IAgent
 			this.stop_condition_value = stop_condition_value;
 		}
 
-	public virtual void set_root(IGameState root_state)
+	public virtual void fit(IGameState root_state)
 	{
 		root_node = new MCTSNode(root_state,null,true);
 	}
-	public virtual int best_action(IGameState root_state)
+	public virtual int predict()
 	{
-		set_root(root_state);
 		simulation_count = 0;
 		simulation_time = 0;
 		DateTime start_time = DateTime.UtcNow;           	
@@ -220,10 +209,11 @@ public class AgentMCTS : IAgent
 }
 public class AgentEPAMCTS : AgentMCTS
 {
-	public int active_pop_size, postulant_pop_size, individuals_count, mutation_growth, mutation_shrink, tournament_size, max_complexity, max_initial_complexity, random_shrink, random_growth;
+	public int active_pop_size, postulant_pop_size, individuals_count, mutation_growth, mutation_shrink, tournament_size, max_complexity, max_initial_complexity, random_shrink, random_growth, generation;
 	public double mutation_rate, elitism;
 	public Dictionary<int,Pattern> active_population = new Dictionary<int, Pattern>();
-	public Dictionary<int,Pattern> postulant_population = new Dictionary<int, Pattern>();
+	public Dictionary<int,Pattern> population = new Dictionary<int, Pattern>();
+	public List<int> current_gen_unmatched_indexes = new List<int>();
 	public AgentEPAMCTS(Random fixed_rand = null
 				,double c = 2
 				,int rollouts = 100
@@ -264,6 +254,39 @@ public class AgentEPAMCTS : AgentMCTS
 			this.stop_condition = stop_condition;
 			this.stop_condition_value = stop_condition_value;
 		}
+		public override void fit(IGameState root_state)
+		{
+			root_node = new MCTSNode(root_state,null,true);
+			initialize_population();
+			current_gen_unmatched_indexes = population.Keys.ToList();
+		}
+		public override int predict()
+		{
+			simulation_count = 0;
+			simulation_time = 0;
+			DateTime start_time = DateTime.UtcNow;           	
+
+			while ((stop_condition == "iterations" && simulation_count < stop_condition_value)||(stop_condition == "time" && simulation_time < stop_condition_value))
+			{
+				simulation();
+				simulation_count++;
+				simulation_time = Convert.ToInt32((DateTime.UtcNow - start_time).TotalMilliseconds);
+			}
+			return recommendation_policy();
+		}
+		public override void simulation()
+		{
+			selected_node = selection(root_node);
+			expanded_node = expansion(selected_node);
+			cumulative_reward = rollout(expanded_node, rollouts);
+			backpropagate(expanded_node, cumulative_reward, rollouts);
+			end_generation();
+		}
+		/*
+		public override MCTSNode selection()
+		{
+
+		}*/
 		public Dictionary<int, int> random_uniform_pattern(IGameState state)
 		{
 			Dictionary<int, int> pattern = new Dictionary<int, int>();
@@ -288,7 +311,7 @@ public class AgentEPAMCTS : AgentMCTS
 		{
 			var state_tuple = state.get_random_future_state();
 			Pattern ind = create_individual(random_uniform_pattern(state_tuple.random_state), state_tuple.random_state);
-			ind.update_current_reward(result_to_reward(state_tuple.final_state),1);
+			ind.update_reward(result_to_reward(state_tuple.final_state),1);
 			return ind;
 		}
 		public Pattern create_individual(Dictionary<int, int> pattern, IGameState state)
@@ -296,6 +319,81 @@ public class AgentEPAMCTS : AgentMCTS
 			Pattern ind = new Pattern(pattern, individuals_count, state);
 			individuals_count++;
 			return ind;
+		}
+		public Dictionary<int,Pattern> random_population(MCTSNode node)
+		{
+			IGameState state = node.state;
+			double collective_reward = 0;
+			Dictionary<int,Pattern> population = new Dictionary<int,Pattern>();
+			for (int i = 0; i < postulant_pop_size; i++)
+			{
+				Pattern ind = new_random_uniform_individual(state);
+				population[ind.index] = ind; 
+				collective_reward += population[ind.index].cumulative_reward;
+			}
+			//to avoid having uneven rewards given different amount of rollouts
+			if (postulant_pop_size < rollouts)
+			{
+				for (int i = 0; i < (rollouts - postulant_pop_size); i++)
+				{
+					collective_reward += result_to_reward(node.state.random_game());
+				}
+			}
+			node.update_reward(collective_reward);
+			return population;
+		}
+		public void initialize_population()
+		{
+			population = random_population(root_node);
+		}
+		public bool pattern_match(Dictionary<int,int> pattern, IGameState state)
+		{
+			foreach (var feature in pattern)
+			{
+				if (feature.Value != state.feature_vector[feature.Key])
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+		public List<int> node_matches(MCTSNode node)
+		{
+			List<int> matches = new List<int>();
+			foreach (var ind in population)
+			{
+				if (ind.Key > node.max_tested_index)
+				{
+					if (pattern_match(ind.Value.pattern, node.state))
+					{
+						node.matching_indexes.Add(ind.Key);
+						matches.Add(ind.Key);
+						try
+						{
+							current_gen_unmatched_indexes.Remove(ind.Key);
+						}
+						catch{}
+					}
+				}
+				else
+				{
+					if (node.matching_indexes.Contains(ind.Key))
+					{
+						matches.Add(ind.Key);
+						try
+						{
+							current_gen_unmatched_indexes.Remove(ind.Key);
+						}
+						catch{}
+					}
+				}
+			}
+			node.max_tested_index = population.Keys.Max();
+			return matches;
+		}
+		public void end_generation()
+		{
+			current_gen_unmatched_indexes = population.Keys.ToList();
 		}
 }
 public class MCTSNode
@@ -386,12 +484,23 @@ public class Pattern
 			this.index = index;
 			this.matching_state = state;
 		}
-	public void update_current_reward(double total_reward, int visits)
+	public void update_reward(double total_reward, int visits)
 	{
 		cumulative_reward += total_reward;
 		this.visits += visits;
 	}
-
+	public double deviation(double comparative_average_reward)
+	{
+		return Math.Abs(average_reward() - comparative_average_reward);
+	}
+	public double average_reward()
+	{
+		return cumulative_reward/visits;
+	}
+	public double fitness(double comparative_average_reward)
+	{
+		return deviation(comparative_average_reward);
+	}
 }
 
 //----------------------------------------------------------------------

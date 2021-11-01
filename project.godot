@@ -14,6 +14,10 @@ config/name="Research_viewer"
 run/main_scene="res://Main_control.tscn"
 config/icon="res://icon.png"
 
+[autoload]
+
+MCTS_lib="*res://scripts/MCTS_lib.cs"
+
 [display]
 
 window/size/width=1400

@@ -11,6 +11,14 @@ public class Main_control : Control
 {
 	//mnk game variables
 		[Export]
+		public int random_seed=0;
+		[Export]
+		public int board_size_m=3;
+		[Export]
+		public int board_size_n=3;
+		[Export]
+		public int line_length_k=3;
+		[Export]
 		public Godot.TileSet mnk_tileset;
 		Godot.PackedScene mnk_game_viewer;
 		Godot.PackedScene node_table;
@@ -22,26 +30,30 @@ public class Main_control : Control
 		public Godot.ScrollContainer pop_inspector;
 		public Godot.GridContainer tree_data;
 		public Godot.GridContainer pop_data;
-	//MCTS variables
-		public MCTS mcts;
-		public MCTS_node selected_node;
-		public MCTS_node expanded_node;
-		public MCTS_node showing_node;
-		public double temporal_reward = 0;
 		public Godot.Label reward_label;
 		public GridContainer MCTS_menu;
 		public Godot.Button selection_button, simulation_button, expansion_button, backpropagation_button, iterate_button, see_suggested_button;
 		public Godot.HSlider N_iterations;
 		public List<HBoxContainer> node_table_list = new List<HBoxContainer>();
 		public List<HBoxContainer> ind_table_list = new List<HBoxContainer>();
+
 	//Class variables
 		public bool M_lock = false;
 		public bool N_lock = false;
 		public bool S_lock = false;
-		public Random rand = new Random();
+		public double temporal_reward = 0;
+
+	//Game variables
+		public IGameState visible_state, current_state;
+		public MCTSNode visible_node, selected_node, expanded_node;
+		public Dictionary<int, IAgent> agents = new Dictionary<int, IAgent>();
+		public int current_agent_index;
+		public Random rand;
+		public List<IGameState> full_current_game = new List<IGameState>();
 
 	public override void _Ready()
 		{
+		MCTS_lib mcts_lib = (MCTS_lib)GetNode("/root/MCTS_lib");
 		mnk_game_viewer = (PackedScene)GD.Load("res://mnk_game_view.tscn");
 		node_table = (PackedScene)GD.Load("res://Node_data.tscn");
 		ind_table = (PackedScene)GD.Load("res://Individual_view.tscn");
@@ -49,33 +61,42 @@ public class Main_control : Control
 		instance_game_viewer.SetPosition(this.RectPosition);
 		this.AddChild(instance_game_viewer);
 		node_data = instance_game_viewer.GetNode<Label>("Node_data");
-		var base_state = new mnk_state();
-		//base_state.set_initial_state(13, 13, 5); //gomoku
-		//base_state.set_initial_state(19, 19, 5); //freestyle gomoku
-		//base_state.set_initial_state(5, 5, 4); // draw
-		//base_state.set_initial_state(6, 6, 5); // draw
-		//base_state.set_initial_state(3, 3, 3); //draw tictactoe
-		base_state.set_initial_state(6, 5, 4); //is a win
-		mnk_game_states.Add(base_state);
-		mcts = new MCTS(base_state);
-		
 		MCTS_menu = GetNode<GridContainer>("MCTS_menu");
 		reward_label = MCTS_menu.GetNode<Label>("Reward");
 		selection_button = MCTS_menu.GetNode<Button>("Selection");
 		expansion_button = MCTS_menu.GetNode<Button>("Expansion");
 		simulation_button = MCTS_menu.GetNode<Button>("Simulation");
-		selection_button = MCTS_menu.GetNode<Button>("Backpropagation");
-		selection_button = MCTS_menu.GetNode<Button>("Iterate");
+		backpropagation_button = MCTS_menu.GetNode<Button>("Backpropagation");
+		iterate_button = MCTS_menu.GetNode<Button>("Iterate");
 		N_iterations = MCTS_menu.GetNode<HSlider>("N_iterations");
+		
 		see_suggested_button = MCTS_menu.GetNode<Button>("See_suggested");
 		tree_inspector = (ScrollContainer)GetNode<ScrollContainer>("Tree_inspector");
 		pop_inspector = (ScrollContainer)GetNode<ScrollContainer>("Pop_inspector");
 		tree_data = tree_inspector.GetNode<GridContainer>("Tree_data");
 		pop_data = pop_inspector.GetNode<GridContainer>("Pop_data");
 
-		view_node(mcts.root_node);
 
-		use_ea(); //this changes mcts
+
+		rand = new Random(random_seed);
+		start_new_game();
+		agents[current_state.player_turn] = new AgentMCTS(fixed_rand:rand);
+		agents[current_state.swap_player(current_state.player_turn)] = new AgentMCTS(fixed_rand:rand);
+		current_agent_index = current_state.player_turn;
+		AgentMCTS tagent = (AgentMCTS)current_agent();
+		tagent.fit(current_state);
+		full_current_game.Add(current_state);
+		//var base_state = new mnk_state{rand=rand};
+		//base_state.set_initial_state(13, 13, 5); //gomoku
+		//base_state.set_initial_state(19, 19, 5); //freestyle gomoku
+		//base_state.set_initial_state(5, 5, 4); // draw
+		//base_state.set_initial_state(6, 6, 5); // draw
+		//base_state.set_initial_state(3, 3, 3); //draw tictactoe
+		//base_state.set_initial_state(6, 5, 4); //is a win
+		//mnk_game_states.Add(base_state);
+		//mcts = new MCTS(base_state, rand);
+		//view_node(mcts.root_node);
+		//use_ea(); //this changes mcts
 		}
 	public override void _Process(float delta)
 		{
@@ -86,8 +107,8 @@ public class Main_control : Control
 				{
 					N_lock = true;
 					GD.Print("Pressed N");
-					var final_state = mnk_game_states[0].random_game();
-					view_mnk_state(final_state);
+					var final_state = current_state.random_game();
+					view_game_state(final_state);
 					node_data.Text = "winner: " + Convert.ToString(final_state.winner);
 				}
 
@@ -96,16 +117,26 @@ public class Main_control : Control
 			{
 				if (!S_lock)
 				{
+					RandomAgent random_agent = new RandomAgent(rand);
+					int wins = 0;
 					S_lock = true;
 					GD.Print("Pressed S");
-					double s_temp_reward = 0;
+					DateTime start_time = DateTime.UtcNow; 
 					for (int i = 0; i < 10000; i++)
 					{
-						var final_state = showing_node.state.random_game();
-						s_temp_reward += mcts.result_to_reward(final_state);
-						//view_mnk_state(final_state);
+						IGameState tstate = current_state.duplicate();
+						while (!tstate.terminal)
+						{
+							random_agent.fit(tstate);
+							tstate.make_action(random_agent.predict());
+						}
+						if (tstate.winner == current_agent_index) wins++;
 					}
-					node_data.Text = "reward after 10000 rand games from this state: " + Convert.ToString(s_temp_reward);
+					
+					node_data.Text = "Wins after 10000 rand games from this state: " 
+									+ Convert.ToString(wins) + " in " 
+									+ Convert.ToString(Convert.ToInt32((DateTime.UtcNow - start_time).TotalMilliseconds)) 
+									+ " milliseconds";
 				}
 
 			}
@@ -115,8 +146,7 @@ public class Main_control : Control
 				{
 					M_lock = true;
 					GD.Print("Pressed M");
-					mcts.iteration();
-					GD.Print(mcts.root_node.children.Count);
+					start_new_game();
 				}
 
 			}
@@ -126,53 +156,6 @@ public class Main_control : Control
 			M_lock = false;
 			N_lock=false;
 			S_lock = false;
-		}
-	public void view_mnk_state(mnk_state state)
-		{
-			//state.view_state();
-			//instance_game_viewer.QueueFree();
-			TileMap mnk_tilemap = (TileMap)instance_game_viewer.GetNode<TileMap>("Board");
-
-			var temp_vec = new Vector2(1, 1);
-
-			int content;
-			for (int x = 0; x < state.n; x++)
-			{
-				for (int y = 0; y < state.m; y++)
-				{
-					temp_vec = new Vector2(x, y);
-					content = (int)state.board[y][x];
-					if (content != 0)
-					{
-						content = content + 2;
-						mnk_tilemap.SetCellv(temp_vec, content);
-					}
-					else mnk_tilemap.SetCellv(temp_vec, 1);
-				}
-			}
-			string feature_string = "";
-			foreach (var feature in state.feature_vector) feature_string += feature.Value;
-			//GD.Print(feature_string);
-		}
-	public void view_node(MCTS_node node)
-		{
-			clear_node_table();
-			view_mnk_state(node.state);
-			node_data.Text = (node._str());
-			showing_node = node;
-			view_in_node_table();//node);
-		}
-	public void view_child_state_from_showing(int child_index)
-		{
-			view_mnk_state(showing_node.children[child_index].state);
-		}
-	public void return_view_to_showing_node()
-		{
-			view_mnk_state(showing_node.state);
-		}
-	public void view_child_from_showing(int child_index)
-		{
-			view_node(showing_node.children[child_index]);
 		}
 	public void clear_node_table()
 		{
@@ -184,17 +167,17 @@ public class Main_control : Control
 		}
 	public void sort_node_table_ucb()
 		{
+			AgentMCTS tagent = (AgentMCTS)current_agent();
 			double safe_counter = 0.00000000001;
 			SortedList sorted_nodes = new SortedList();
 			foreach (HBoxContainer node_table_container in node_table_list)
 			{
 				Label node_index_label = node_table_container.GetNode<Label>("Child_index");
 				int child_index = Convert.ToInt32(node_index_label.Text);
-				//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
-				try {sorted_nodes.Add(showing_node.children[child_index].UCB(mcts.c) , node_table_container);}
+				try {sorted_nodes.Add(tagent.UCB(visible_node.children[child_index]) , node_table_container);}
 				catch
 				{
-					sorted_nodes.Add(showing_node.children[child_index].UCB(mcts.c) + safe_counter, node_table_container);
+					sorted_nodes.Add(tagent.UCB(visible_node.children[child_index]) + safe_counter, node_table_container);
 					safe_counter += 0.00000000001;
 				}
 			}
@@ -216,10 +199,10 @@ public class Main_control : Control
 				Label node_index_label = node_table_container.GetNode<Label>("Child_index");
 				int child_index = Convert.ToInt32(node_index_label.Text);
 				//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
-				try {sorted_nodes.Add((double)showing_node.children[child_index].visits , node_table_container);}
+				try {sorted_nodes.Add((double)visible_node.children[child_index].visits , node_table_container);}
 				catch
 				{
-					sorted_nodes.Add((double)showing_node.children[child_index].visits + safe_counter, node_table_container);
+					sorted_nodes.Add((double)visible_node.children[child_index].visits + safe_counter, node_table_container);
 					safe_counter += 0.00000000001;
 				}
 			}
@@ -241,10 +224,10 @@ public class Main_control : Control
 				Label node_index_label = node_table_container.GetNode<Label>("Child_index");
 				int child_index = Convert.ToInt32(node_index_label.Text);
 				//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
-				try {sorted_nodes.Add(showing_node.children[child_index].reward/showing_node.children[child_index].visits , node_table_container);}
+				try {sorted_nodes.Add(visible_node.children[child_index].average_reward() , node_table_container);}
 				catch
 				{
-					sorted_nodes.Add(showing_node.children[child_index].reward/showing_node.children[child_index].visits + safe_counter, node_table_container);
+					sorted_nodes.Add(visible_node.children[child_index].average_reward() + safe_counter, node_table_container);
 					safe_counter += 0.00000000001;
 				}
 			}
@@ -266,14 +249,15 @@ public class Main_control : Control
 			double max_visits = 0;
 			double min_visits = 1;
 			bool first_time = true;
-			MCTS_node node = showing_node;
+			MCTSNode node = visible_node;
+			AgentMCTS tagent = (AgentMCTS)current_agent();
 
 			foreach (var child_node in node.children)
 			{
 				if (first_time)
 				{
-					max_ucb = child_node.Value.UCB(mcts.c);
-					min_ucb = child_node.Value.UCB(mcts.c);
+					max_ucb = tagent.UCB(child_node.Value);
+					min_ucb = tagent.UCB(child_node.Value);
 					max_reward = child_node.Value.reward/child_node.Value.visits;
 					min_reward = child_node.Value.reward/child_node.Value.visits;
 					max_visits = child_node.Value.visits;
@@ -283,7 +267,7 @@ public class Main_control : Control
 				}
 				else
 				{
-					double child_ucb = child_node.Value.UCB(mcts.c);
+					double child_ucb = tagent.UCB(child_node.Value);
 					if (child_ucb < min_ucb) min_ucb = child_ucb;
 					else if (child_ucb > max_ucb) max_ucb = child_ucb;
 					if (child_node.Value.reward/child_node.Value.visits < min_reward) min_reward = child_node.Value.reward/child_node.Value.visits;
@@ -295,7 +279,7 @@ public class Main_control : Control
 				Godot.HBoxContainer instance_node_inspector = (HBoxContainer)node_table.Instance();
 				instance_node_inspector.Connect("pressed_view_child", this, "view_child_from_showing");
 				instance_node_inspector.Connect("hovered_view_child", this, "view_child_state_from_showing");
-				instance_node_inspector.Connect("exit_hover", this, "return_view_to_showing_node");
+				instance_node_inspector.Connect("exit_hover", this, "return_view_to_current_state");
 				
 				Label child_index = (Label)instance_node_inspector.GetNode<Label>("Child_index");
 				child_index.Text = Convert.ToString(child_node.Key);
@@ -327,7 +311,7 @@ public class Main_control : Control
 					Godot.ProgressBar ucb_progress = node_row.GetNode<ProgressBar>("UCB_relative");
 					ucb_progress.MinValue = min_ucb;
 					ucb_progress.MaxValue = max_ucb;
-					ucb_progress.Value = child_node.Value.UCB(mcts.c);
+					ucb_progress.Value = tagent.UCB(child_node.Value);
 					Godot.ProgressBar reward_progress = node_row.GetNode<ProgressBar>("Rew_relative");
 					reward_progress.MinValue = min_reward;
 					reward_progress.MaxValue = max_reward;
@@ -342,6 +326,7 @@ public class Main_control : Control
 		}
 	public void update_pop_table()
 		{
+			/*
 			clear_ind_table();
 			foreach (var ind in mcts.postulant_population)
 			{
@@ -360,14 +345,16 @@ public class Main_control : Control
 				Label fitness = (Label)instance_ind_inspector.GetNode<Label>("Fitness");
 				fitness.Text = ind.Value.fitness(mcts.collective_average_visits(mcts.postulant_population),mcts.selection_c, mcts.root_node.average_reward()).ToString("G5");
 				Label significance = (Label)instance_ind_inspector.GetNode<Label>("Significance");
-				significance.Text = Math.Abs(ind.Value.average_reward-mcts.root_node.average_reward()).ToString("G5");
+				significance.Text = Math.Log(ind.Value.visits).ToString("G5"); //mcts.selection_c * 
 				Label deviation = (Label)instance_ind_inspector.GetNode<Label>("Deviation");
 				deviation.Text = ind.Value.average_deviation.ToString("G5"); 
 			}
 			sort_ind_table_fitness();
+			*/
 		}
 	public void sort_ind_table_fitness()
 		{
+			/*
 			//https://developerpublish.com/c-tips-and-tricks-17-sort-dictionary-by-its-value/
 			ind_table_list.Sort((i1, i2) => mcts.postulant_population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].fitness(mcts.collective_average_visits(mcts.postulant_population),mcts.selection_c, mcts.root_node.average_reward())
 											.CompareTo(mcts.postulant_population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].fitness(mcts.collective_average_visits(mcts.postulant_population),mcts.selection_c, mcts.root_node.average_reward())));
@@ -375,22 +362,27 @@ public class Main_control : Control
 			{
 				pop_data.MoveChild(ind_table_list[i], ind_table_list.Count + 1 - i);
 			}
+			*/
 		}
 	public void sort_ind_table_visits()
 		{
+			/*
 			ind_table_list.Sort((i1, i2) => mcts.postulant_population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].visits.CompareTo(mcts.postulant_population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].visits));
 			for (int i=0; i<ind_table_list.Count; i++)
 			{
 				pop_data.MoveChild(ind_table_list[i], ind_table_list.Count + 1 - i);
 			}
+			*/
 		}
 	public void sort_ind_table_deviation()
 		{
+			/*
 			ind_table_list.Sort((i1, i2) => mcts.postulant_population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].average_deviation.CompareTo(mcts.postulant_population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].average_deviation));
 			for (int i=0; i<ind_table_list.Count; i++)
 			{
 				pop_data.MoveChild(ind_table_list[i], ind_table_list.Count + 1 - i);
 			}
+			*/
 		}
 	public void clear_ind_table()
 		{
@@ -402,12 +394,15 @@ public class Main_control : Control
 		}
 	public void view_postulant_individual(int individual_index)
 		{
+			/*
 			Pattern_individual ind = mcts.postulant_population[individual_index];
 			view_pattern(ind.pattern);
 			node_data.Text = "Match: " + Convert.ToString(mcts.pattern_match(ind.pattern, showing_node.state));
+			*/
 		}
 	public void view_pattern(Dictionary<int, int> pattern)
 		{
+			/*
 			clear_view();
 			TileMap mnk_tilemap = (TileMap)instance_game_viewer.GetNode<TileMap>("Board");
 			var temp_vec = new Vector2(1, 1);
@@ -421,19 +416,22 @@ public class Main_control : Control
 					}
 				else mnk_tilemap.SetCellv(temp_vec, 1);
 			}
+			*/
 		}
 	public void view_matching_state(int individual_index)
 		{
+			/*
 			view_mnk_state(mcts.postulant_population[individual_index].matching_state);
 			node_data.Text = "Stored matching state";
+			*/
 		}
 	public void clear_view()
 		{
 			TileMap mnk_tilemap = (TileMap)instance_game_viewer.GetNode<TileMap>("Board");
 			var temp_vec = new Vector2(1, 1);
-			for (int x = 0; x < mcts.root_node.state.n; x++)
+			for (int x = 0; x < board_size_n; x++)
 			{
-				for (int y = 0; y < mcts.root_node.state.m; y++)
+				for (int y = 0; y < board_size_m; y++)
 				{
 					temp_vec = new Vector2(x, y);
 					mnk_tilemap.SetCellv(temp_vec, 6);
@@ -442,16 +440,18 @@ public class Main_control : Control
 		}
 	public void mcts_view_root_node()
 		{
-			view_node(mcts.root_node);
+			AgentMCTS tagent = (AgentMCTS)current_agent();
+			view_node(tagent.root_node);
 		}
 	public void mcts_selection()
 		{
-			selected_node = mcts.ea_UCT_policy(mcts.root_node);
+			AgentMCTS tagent = (AgentMCTS)current_agent();
+			selected_node = tagent.selection(tagent.root_node);
 		}
 	public void mcts_expansion()
 		{
-			if (selected_node.is_leaf()) expanded_node = mcts.random_expansion(selected_node);
-			else GD.Print("mcts_expansion didnt receive a leaf node");
+			AgentMCTS tagent = (AgentMCTS)current_agent();
+			expanded_node = tagent.expansion(selected_node);
 		}
 	public void view_selected_node()
 		{
@@ -463,75 +463,113 @@ public class Main_control : Control
 		}
 	public void mcts_simulation()
 		{
-			temporal_reward = mcts.ea_simulation(expanded_node);
-			//update_pop_table();
-			//reward_label.Text = "Reward: " + Convert.ToString(temporal_reward);
+			AgentMCTS tagent = (AgentMCTS)current_agent();
+			temporal_reward = tagent.rollout(expanded_node, tagent.rollouts);
 		}
 	public void mcts_backpropagation()
 		{
-			mcts.backpropagate(expanded_node, temporal_reward);
+			AgentMCTS tagent = (AgentMCTS)current_agent();
+			tagent.backpropagate(expanded_node, tagent.rollouts, tagent.rollouts);
 		}
 	public void mcts_iterate()
 		{
-			//mcts.ea_iteration((int)N_iterations.Value);
-			//mcts_view_root_node();
-			/*
-			for (int i=0; i<N_iterations.Value; i++)
+			AgentMCTS tagent = (AgentMCTS)current_agent();
+			for (int i = 0; i < (int)N_iterations.Value; i++)
 			{
-				mcts_selection();
-				mcts_expansion();
-				mcts_simulation();
-				mcts_backpropagation();
-			}*/
-			mcts.ea_iteration((int)N_iterations.Value);
+				tagent.simulation();
+			}
 			mcts_view_root_node();
 			update_pop_table();
-			/*
-			System.Threading.Thread t = new System.Threading.Thread(() => thread_iter());
-			try{
-			t.Start();
-			}
-			catch{GD.Print("Thread issue, try again");}
-			*/
-			//thread_iter();
-			/*
-			for (int i = 0; i < N_iterations.Value; i++)
-			{
-			mcts_selection();
-			mcts_expansion();
-			mcts_simulation();
-			mcts_backpropagation();
-			view_expanded_node();
-			}*/
-		}
-	public void thread_iter()
-		{
-			for (int i = 0; i < N_iterations.Value; i++)
-			{
-			mcts_selection();
-			mcts_expansion();
-			mcts_simulation();
-			mcts_backpropagation();
-			view_expanded_node();
-			}
-			//update_pop_table();
+
 		}
 	public void see_suggested_move()
 		{
-			//int index = mcts.suggested_action_index();
-			int index = mcts.robust_action_index();
-			//GD.Print("Best actions index: ", index, " children ", mcts.root_node.children.Count);
-			view_node(mcts.root_node.children[index]);
+			AgentMCTS tagent = (AgentMCTS)current_agent();
+			int index = tagent.recommendation_policy();
+			view_node(tagent.root_node.children[index]);
 		}
 	public void see_parent()
 		{
-			if (!showing_node.is_root) view_node(showing_node.parent);
+			if (!visible_node.is_root) view_node(visible_node.parent);
 		}
-	public void use_ea()
+	public void start_new_game()
+	{
+		IGameState state = (IGameState)new MNKGameState{m=board_size_m
+														,n=board_size_n
+														,k=line_length_k
+														,rand=rand};
+		state.set_initial_state();
+		view_game_state(state);
+		current_state = state;
+	}
+	public void view_game_state(IGameState state)
+	{
+		visible_state = state;
+		TileMap mnk_tilemap = (TileMap)instance_game_viewer.GetNode<TileMap>("Board");
+		var temp_vec = new Vector2(1, 1);
+		int content;
+		for (int x = 0; x < board_size_n; x++)
 		{
-			mcts.initialize_population();
-			update_pop_table();
+			for (int y = 0; y < board_size_m; y++)
+			{
+				temp_vec = new Vector2(x, y);
+				content = (int)state.board[y][x];
+				if (content != 0)
+				{
+					content = content + 2;
+					mnk_tilemap.SetCellv(temp_vec, content);
+				}
+				else mnk_tilemap.SetCellv(temp_vec, 1);
+			}
 		}
+		string feature_string = "";
+		foreach (var feature in state.feature_vector) feature_string += feature.Value;
+		GD.Print("Showing state's feature vector:", feature_string);
+	}
+	public void view_node(MCTSNode node)
+		{
+			clear_node_table();
+			view_game_state(node.state);
+			node_data.Text = (node._str());
+			visible_node = node;
+			view_in_node_table();//node);
+		}
+	public void view_child_state_from_showing(int child_index)
+		{
+			view_game_state(visible_node.children[child_index].state);
+		}
+	public void view_child_from_showing(int child_index)
+		{
+			view_node(visible_node.children[child_index]);
+		}
+	public void view_root_node()
+		{
+			try
+			{
+				AgentMCTS current_agent = (AgentMCTS)agents[current_agent_index];
+				view_node(current_agent.root_node);
+			}
+			catch{GD.Print("Invalid request to view root node");}
+		}
+	public void return_view_to_current_state()
+		{
+			view_game_state(current_state);
+		}
+	public IAgent current_agent()
+	{
+		return agents[current_agent_index];
+	}
+	public void execute_action(int action_index)
+	{
+		IGameState new_state = current_state.duplicate();
+		new_state.make_action(action_index);
+		full_current_game.Add(new_state);
+		current_state = new_state;
+
+		//Update UI
+		view_game_state(current_state);
+		view_in_node_table();
+	}
 }
 
 //MCTS
@@ -556,7 +594,7 @@ public class MCTS_node
 		public bool is_root;
 		public List<int> postulant_population_matching_indexes = new List<int>();
 		public List<int> active_population_matching_indexes = new List<int>();
-
+		public List<int> matching_origin_indexes = new List<int>();
 	public MCTS_node(mnk_state t_state, MCTS_node t_parent, bool t_is_root=false, int t_action_index = -1)
 		{
 			state = t_state;
@@ -640,9 +678,10 @@ public class MCTS
 		private List<int> temporal_ints = new List<int>();
 		private int random_shrink;
 		private int random_growth;
-		public Random rand = new Random();
+		public Random rand;
 
 	public MCTS(mnk_state root_state
+				,Random fixed_rand = null
 				,double c = 2
 				,int rollouts = 100
 				,double win_value = 1
@@ -661,6 +700,12 @@ public class MCTS
 				,int tournament_size = 5)
 		{
 			root_node = new MCTS_node(root_state, null, true);
+			if (fixed_rand == null) rand = new Random();
+			else 
+			{
+				rand = fixed_rand;
+				GD.Print("Random seed passed");
+			}
 			this.c = c;
 			this.rollouts = rollouts;
 			this.win_value = win_value;
@@ -923,7 +968,7 @@ public class MCTS
 			}
 			return population;
 		}
-	public void initialize_population() //temporal debugging setup
+	public void initialize_population()
 		{
 			postulant_population = get_random_initial_population(root_node.state);
 			foreach (var ind in postulant_population)
@@ -1386,9 +1431,9 @@ public class Pattern_individual
 			//return Math.Abs(average_deviation)*(visits/(total_age+1));
 			//return Math.Abs(root_reward-average_reward)*(visits/(total_age+1));
 			//return Math.Abs(average_reward);
-			if (average_visits() > 0) return Math.Abs(root_reward-average_reward) + selection_c * Math.Sqrt(Math.Log(collective_visits) / average_visits());
-			//return Math.Abs(root_reward-average_reward) * Math.Log(selection_c * visits);
-			else return -double.PositiveInfinity;
+			//if (average_visits() > 0) return Math.Abs(root_reward-average_reward) + selection_c * Math.Sqrt(Math.Log(collective_visits) / average_visits());
+			return Math.Abs(root_reward-average_reward) * Math.Log(selection_c * visits);
+			//else return -double.PositiveInfinity;
 			//return Math.Abs(root_reward-average_reward)
 		} 
 	public void make_older()
@@ -1569,34 +1614,6 @@ public class mnk_state
 		}
 		return ds;
 	}
-	public unsafe void set_feature_vector_pointers()//feature_vector()
-	{
-		/*
-		int feature_vector_length = n*m+1;
-		feature_vector_pointers = new int*[feature_vector_length];
-		for (int i = 0; i < feature_vector_length; i++)
-		{
-			feature_vector_pointers[i] = null;
-		}
-		fixed(int* temp_pointer = &player_turn)
-		{
-			feature_vector_pointers[0] = temp_pointer;
-		}
-		
-		fixed(int* temp_pointer = &board)
-		{
-			feature_vector_pointers[0] = temp_pointer;
-		}
-		feature_vector_pointers[0] = &player_turn;
-		for (int y = 0; y < m; y++)
-		{
-			for (int x = 0; x < n; x++)
-			{
-				feature_vector.Add(board[x][y]);
-			}
-		}*/
-
-	}
 	public void set_feature_vector() //Dictionary<int, int>
 	{
 		//feature_vector[0] = player_turn;
@@ -1637,7 +1654,8 @@ public class mnk_state
 			terminal = terminal,
 			feature_index_to_board_coordinates = feature_index_to_board_coordinates,
 			coordinates_to_feature_index = coordinates_to_feature_index,
-			feature_vector = duplicate_feature_vector
+			feature_vector = duplicate_feature_vector,
+			rand = rand
 		};
 
 		return the_duplicate;
@@ -1688,7 +1706,7 @@ public class mnk_action
 	}
 	public mnk_action duplicate()
 	{
-		mnk_action the_duplicate = new mnk_action(x,y);// { x = x, y = y };
+		mnk_action the_duplicate = new mnk_action(x,y);
 		return the_duplicate;
 	}
 }
