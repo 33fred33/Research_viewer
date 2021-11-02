@@ -3,17 +3,19 @@
 [ext_resource path="res://mnk_tileset.tres" type="TileSet" id=1]
 
 [node name="Game_view" type="VBoxContainer"]
+anchor_right = 0.361
+anchor_bottom = 0.418
 margin_left = 11.0
 margin_top = 6.0
-margin_right = 647.0
-margin_bottom = 634.0
+margin_right = -0.400055
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="Node_data" type="Label" parent="."]
-margin_right = 636.0
+margin_right = 494.0
 margin_bottom = 31.0
+mouse_filter = 1
 text = "Node data
 "
 align = 1

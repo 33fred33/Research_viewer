@@ -4,22 +4,26 @@
 [ext_resource path="res://Main_control.cs" type="Script" id=2]
 
 [node name="Main_control" type="Control"]
-margin_left = 26.3735
-margin_top = 18.6603
-margin_right = 597.374
-margin_bottom = 589.66
+margin_left = 26.0
+margin_top = 19.0
+margin_right = 602.0
+margin_bottom = 590.0
 script = ExtResource( 2 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
-random_seed = 12
+random_seed = 3
 mnk_tileset = ExtResource( 1 )
 
 [node name="MCTS_menu" type="GridContainer" parent="."]
-margin_left = 682.0
-margin_top = 29.0
-margin_right = 971.0
-margin_bottom = 238.0
+anchor_left = 1.021
+anchor_top = 0.673
+anchor_right = 1.481
+anchor_bottom = 1.69
+margin_left = -0.0960083
+margin_top = -0.28302
+margin_right = -0.0560303
+margin_bottom = -392.99
 columns = 2
 __meta__ = {
 "_edit_use_anchors_": false
@@ -146,13 +150,13 @@ __meta__ = {
 }
 
 [node name="Tree_inspector" type="ScrollContainer" parent="."]
-anchor_left = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-margin_left = 133.999
-margin_top = 250.0
-margin_right = 409.999
-margin_bottom = 9.00031
+anchor_left = 1.163
+anchor_right = 2.364
+anchor_bottom = 0.655
+margin_left = 144.112
+margin_top = 31.0
+margin_right = -57.6641
+margin_bottom = -1.005
 rect_scale = Vector2( 0.995764, 1.00221 )
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -161,75 +165,115 @@ __meta__ = {
 }
 
 [node name="Tree_data" type="GridContainer" parent="Tree_inspector"]
-margin_right = 276.0
-margin_bottom = 330.0
+margin_right = 490.0
+margin_bottom = 342.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 custom_constants/vseparation = 0
 custom_constants/hseparation = 0
 
 [node name="Main_buttons" type="HBoxContainer" parent="Tree_inspector/Tree_data"]
-margin_right = 276.0
+margin_right = 490.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 custom_constants/separation = 0
 
 [node name="Go_to_parent" type="Button" parent="Tree_inspector/Tree_data/Main_buttons"]
-margin_right = 138.0
+margin_right = 245.0
 margin_bottom = 20.0
+mouse_filter = 1
 size_flags_horizontal = 3
 
 [node name="Go_to_selected" type="Button" parent="Tree_inspector/Tree_data/Main_buttons"]
-margin_left = 138.0
-margin_right = 276.0
+margin_left = 245.0
+margin_right = 490.0
 margin_bottom = 20.0
+mouse_filter = 1
 size_flags_horizontal = 3
 
 [node name="Headers" type="HBoxContainer" parent="Tree_inspector/Tree_data"]
 margin_top = 20.0
-margin_right = 276.0
+margin_right = 490.0
 margin_bottom = 40.0
 size_flags_horizontal = 3
 custom_constants/separation = 0
 
 [node name="View" type="Label" parent="Tree_inspector/Tree_data/Headers"]
 margin_top = 3.0
-margin_right = 69.0
+margin_right = 70.0
 margin_bottom = 17.0
+mouse_filter = 1
 size_flags_horizontal = 3
 text = "View"
 align = 1
 clip_text = true
 
-[node name="UCB_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 69.0
-margin_right = 138.0
-margin_bottom = 20.0
-size_flags_horizontal = 3
-text = "UCB"
-
-[node name="Visits_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 138.0
-margin_right = 207.0
-margin_bottom = 20.0
-size_flags_horizontal = 3
-text = "Visits"
-
 [node name="Reward_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 207.0
-margin_right = 276.0
+margin_left = 70.0
+margin_right = 140.0
 margin_bottom = 20.0
+mouse_filter = 1
 size_flags_horizontal = 3
 text = "Rew"
 
+[node name="Exploitation" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 140.0
+margin_right = 210.0
+margin_bottom = 20.0
+mouse_filter = 1
+size_flags_horizontal = 3
+text = "Exploit"
+
+[node name="Exploration" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 210.0
+margin_right = 280.0
+margin_bottom = 20.0
+mouse_filter = 1
+size_flags_horizontal = 3
+text = "Explor"
+
+[node name="Visits_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 280.0
+margin_right = 350.0
+margin_bottom = 20.0
+mouse_filter = 1
+size_flags_horizontal = 3
+text = "Visits"
+
+[node name="Children" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 350.0
+margin_right = 420.0
+margin_bottom = 20.0
+mouse_filter = 1
+size_flags_horizontal = 3
+text = "Children"
+
+[node name="Actions" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 420.0
+margin_right = 490.0
+margin_bottom = 20.0
+mouse_filter = 1
+size_flags_horizontal = 3
+text = "Actions"
+
+[node name="UCB_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+visible = false
+margin_left = 529.0
+margin_right = 635.0
+margin_bottom = 20.0
+mouse_filter = 1
+size_flags_horizontal = 3
+text = "UCB"
+
 [node name="Pop_inspector" type="ScrollContainer" parent="."]
-anchor_left = 1.795
-anchor_right = 2.904
-anchor_bottom = 1.059
-margin_left = -49.9459
-margin_top = 28.0
-margin_right = -312.186
-margin_bottom = -30.6887
+anchor_left = 1.484
+anchor_top = 0.673
+anchor_right = 2.371
+anchor_bottom = 1.499
+margin_left = 0.215942
+margin_top = -0.28302
+margin_right = -57.696
+margin_bottom = -109.929
 rect_scale = Vector2( 0.995764, 1.00221 )
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -238,49 +282,42 @@ __meta__ = {
 }
 
 [node name="Pop_data" type="GridContainer" parent="Pop_inspector"]
-margin_right = 371.0
-margin_bottom = 546.0
+margin_right = 453.0
+margin_bottom = 362.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 custom_constants/vseparation = 0
 custom_constants/hseparation = 0
 
 [node name="Main_buttons" type="HBoxContainer" parent="Pop_inspector/Pop_data"]
-margin_right = 370.0
+margin_right = 453.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 custom_constants/separation = 0
 
 [node name="Update" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
-margin_right = 123.0
+margin_right = 226.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Update"
 
-[node name="Restart" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
-margin_left = 123.0
-margin_right = 246.0
+[node name="Show_matches" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
+margin_left = 226.0
+margin_right = 453.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Restart pop"
-
-[node name="Use_EA" type="Button" parent="Pop_inspector/Pop_data/Main_buttons"]
-margin_left = 246.0
-margin_right = 370.0
-margin_bottom = 20.0
-size_flags_horizontal = 3
-text = "Use EA"
+text = "Show matches only"
 
 [node name="Headers" type="HBoxContainer" parent="Pop_inspector/Pop_data"]
 margin_top = 20.0
-margin_right = 370.0
+margin_right = 453.0
 margin_bottom = 40.0
 size_flags_horizontal = 3
 custom_constants/separation = 0
 
 [node name="View" type="Label" parent="Pop_inspector/Pop_data/Headers"]
 margin_top = 3.0
-margin_right = 60.0
+margin_right = 75.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 text = "View"
@@ -288,36 +325,36 @@ align = 1
 clip_text = true
 
 [node name="Age_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 60.0
-margin_right = 120.0
+margin_left = 75.0
+margin_right = 151.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Age"
 
 [node name="Visits_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 120.0
-margin_right = 180.0
+margin_left = 151.0
+margin_right = 226.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Visits"
 
 [node name="Fitness_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 180.0
-margin_right = 240.0
+margin_left = 226.0
+margin_right = 302.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Fitness"
 
 [node name="Certainty_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 240.0
-margin_right = 310.0
+margin_left = 302.0
+margin_right = 377.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Root_dev"
 
 [node name="Deviation_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 310.0
-margin_right = 370.0
+margin_left = 377.0
+margin_right = 453.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Deviat"
@@ -334,11 +371,15 @@ text = "Deviat"
 [connection signal="button_down" from="MCTS_menu/See_suggested" to="." method="see_suggested_move"]
 [connection signal="button_down" from="MCTS_menu/See_parent" to="." method="see_parent"]
 [connection signal="button_down" from="MCTS_menu/Takeback" to="." method="takeback"]
-[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/UCB_sort" to="." method="sort_node_table_ucb"]
-[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Visits_sort" to="." method="sort_node_table_visits"]
 [connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Reward_sort" to="." method="sort_node_table_reward"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Exploitation" to="." method="sort_node_table_reward"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Exploration" to="." method="sort_node_table_reward"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Visits_sort" to="." method="sort_node_table_visits"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Children" to="." method="sort_node_table_visits"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Actions" to="." method="sort_node_table_visits"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/UCB_sort" to="." method="sort_node_table_ucb"]
 [connection signal="button_down" from="Pop_inspector/Pop_data/Main_buttons/Update" to="." method="update_pop_table"]
-[connection signal="button_down" from="Pop_inspector/Pop_data/Main_buttons/Use_EA" to="." method="use_ea"]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Main_buttons/Show_matches" to="." method="_on_Show_matches_button_down"]
 [connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Visits_sort" to="." method="sort_ind_table_visits"]
 [connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Fitness_sort" to="." method="sort_ind_table_fitness"]
 [connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Deviation_sort" to="." method="sort_ind_table_deviation"]
