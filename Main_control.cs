@@ -79,8 +79,8 @@ public class Main_control : Control
 
 		rand = new Random(random_seed);
 		start_new_game();
-		//agents[current_state.player_turn] = new AgentMCTS(fixed_rand:rand);
-		agents[current_state.player_turn] = new AgentEPAMCTS(fixed_rand:rand);
+		agents[current_state.player_turn] = new AgentMCTS(fixed_rand:rand);
+		//agents[current_state.player_turn] = new AgentEPAMCTS(fixed_rand:rand);
 		agents[current_state.swap_player(current_state.player_turn)] = new AgentMCTS(fixed_rand:rand);
 		current_agent().fit(current_state);
 		view_agent_info(current_agent());
@@ -474,8 +474,7 @@ public class Main_control : Control
 			{
 				tagent.simulation();
 			}
-			mcts_view_root_node();
-			update_pop_table();
+			view_agent_info((IAgent)tagent);
 
 		}
 	public void see_suggested_move()
@@ -528,7 +527,7 @@ public class Main_control : Control
 			view_game_state(node.state);
 			node_data.Text = (node._str());
 			visible_node = node;
-			view_in_node_table();//node);
+			//view_in_node_table();//node);
 		}
 	public void view_child_state_from_showing(int child_index)
 		{
@@ -588,12 +587,14 @@ public class Main_control : Control
 			view_node(mctsagent.root_node);
 			view_in_node_table();
 		}
-		AgentEPAMCTS epamctsagent = tagent as AgentEPAMCTS;
-		if (epamctsagent != null)
-		{
-			view_node(epamctsagent.root_node);
-			view_in_node_table();
-			update_pop_table();
+		else{
+			AgentEPAMCTS epamctsagent = tagent as AgentEPAMCTS;
+			if (epamctsagent != null)
+			{
+				view_node(epamctsagent.root_node);
+				view_in_node_table();
+				update_pop_table();
+			}
 		}
 
 	}

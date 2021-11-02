@@ -483,7 +483,8 @@ public class MCTSNode
 					+ ", Visits " + Convert.ToString(visits) 
 					+ ", AvgReward " + Convert.ToString(average_reward()) 
 					+ ", Actions " + Convert.ToString(state.available_actions.Count)
-					+ ", Children " + Convert.ToString(children.Count); 
+					+ ", Children " + Convert.ToString(children.Count)
+					+ ", N_Matches" + Convert.ToString(matching_indexes.Count); 
 			return s;
 		}
 	public double average_reward()

@@ -12,13 +12,14 @@ script = ExtResource( 2 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
+random_seed = 12
 mnk_tileset = ExtResource( 1 )
 
 [node name="MCTS_menu" type="GridContainer" parent="."]
 margin_left = 682.0
 margin_top = 29.0
 margin_right = 971.0
-margin_bottom = 384.0
+margin_bottom = 238.0
 columns = 2
 __meta__ = {
 "_edit_use_anchors_": false
@@ -148,9 +149,9 @@ __meta__ = {
 anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-margin_left = 108.999
-margin_top = 246.0
-margin_right = 384.999
+margin_left = 133.999
+margin_top = 250.0
+margin_right = 409.999
 margin_bottom = 9.00031
 rect_scale = Vector2( 0.995764, 1.00221 )
 size_flags_horizontal = 3
@@ -161,7 +162,7 @@ __meta__ = {
 
 [node name="Tree_data" type="GridContainer" parent="Tree_inspector"]
 margin_right = 276.0
-margin_bottom = 334.0
+margin_bottom = 330.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 custom_constants/vseparation = 0
