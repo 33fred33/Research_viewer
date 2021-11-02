@@ -200,9 +200,9 @@ public class AgentMCTS : IAgent
 			if (final_state.winner == root_node.state.swap_player(root_node.state.player_turn)) return lose_value;
 			return draw_value;
 		}
-	public double UCB(MCTSNode node)
+	public virtual double UCB(MCTSNode node)
 		{
-			if (node.visits > 0) return node.average_reward() + c * Math.Sqrt(Math.Log(node.parent.visits) / node.visits);
+			if (node.visits > 0) return node.average_reward() + c * Math.Sqrt(2*Math.Log(node.parent.visits) / node.visits);
 			else return double.PositiveInfinity;
 		}
 
@@ -213,7 +213,7 @@ public class AgentEPAMCTS : AgentMCTS
 	public double mutation_rate, elitism;
 	public Dictionary<int,Pattern> active_population = new Dictionary<int, Pattern>();
 	public Dictionary<int,Pattern> population = new Dictionary<int, Pattern>();
-	public List<int> current_gen_unmatched_indexes = new List<int>();
+	public LinkedList<int> current_gen_unmatched_indexes = new LinkedList<int>();
 	public AgentEPAMCTS(Random fixed_rand = null
 				,double c = 2
 				,int rollouts = 100
@@ -258,7 +258,7 @@ public class AgentEPAMCTS : AgentMCTS
 		{
 			root_node = new MCTSNode(root_state,null,true);
 			initialize_population();
-			current_gen_unmatched_indexes = population.Keys.ToList();
+			reset_current_gen_unmatched();
 		}
 		public override int predict()
 		{
@@ -282,11 +282,24 @@ public class AgentEPAMCTS : AgentMCTS
 			backpropagate(expanded_node, cumulative_reward, rollouts);
 			end_generation();
 		}
-		/*
-		public override MCTSNode selection()
+		public override MCTSNode selection(MCTSNode node)
+	{
+		List<int> matches = node_matches(node);
+		foreach (int pattern_idx in matches)
 		{
-
-		}*/
+			current_gen_unmatched_indexes.Remove(pattern_idx);
+		}
+		while (!node.is_leaf())
+		{
+			node = select_UCB(node);
+			matches = node_matches(node);
+			foreach (int pattern_idx in matches)
+			{
+				current_gen_unmatched_indexes.Remove(pattern_idx);
+			}
+		}
+		return node;
+	}
 		public Dictionary<int, int> random_uniform_pattern(IGameState state)
 		{
 			Dictionary<int, int> pattern = new Dictionary<int, int>();
@@ -339,7 +352,7 @@ public class AgentEPAMCTS : AgentMCTS
 					collective_reward += result_to_reward(node.state.random_game());
 				}
 			}
-			node.update_reward(collective_reward);
+			node.update_reward(collective_reward/rollouts);
 			return population;
 		}
 		public void initialize_population()
@@ -359,41 +372,63 @@ public class AgentEPAMCTS : AgentMCTS
 		}
 		public List<int> node_matches(MCTSNode node)
 		{
+			//Find matches
+			int max_key_in_population = population.Keys.Max();
 			List<int> matches = new List<int>();
 			foreach (var ind in population)
 			{
-				if (ind.Key > node.max_tested_index)
-				{
-					if (pattern_match(ind.Value.pattern, node.state))
-					{
-						node.matching_indexes.Add(ind.Key);
+				if (ind.Key > node.max_tested_index){
+					if (pattern_match(ind.Value.pattern, node.state)){
 						matches.Add(ind.Key);
-						try
-						{
-							current_gen_unmatched_indexes.Remove(ind.Key);
-						}
-						catch{}
 					}
 				}
-				else
-				{
-					if (node.matching_indexes.Contains(ind.Key))
-					{
+				else{
+					if (node.matching_indexes.Contains(ind.Key)){
 						matches.Add(ind.Key);
-						try
-						{
-							current_gen_unmatched_indexes.Remove(ind.Key);
-						}
-						catch{}
 					}
 				}
 			}
-			node.max_tested_index = population.Keys.Max();
+
+			if (node.max_tested_index < max_key_in_population){
+				//New node max index
+				node.max_tested_index = max_key_in_population;
+				//Reset node's matching indexes
+				node.matching_indexes.Clear();
+				foreach (int idx in matches){
+					node.matching_indexes.AddFirst(idx);
+				}
+			}
+			
 			return matches;
+		}
+		public override double UCB(MCTSNode node)
+		{
+			if (node.visits > 0) 
+			{
+				List<int> matches = node_matches(node);
+				double pattern_based_reward = 0;
+				int total_pattern_visits = 0;
+				foreach (int idx in matches)
+				{
+					pattern_based_reward += population[idx].cumulative_reward;
+					total_pattern_visits += population[idx].visits;
+				}
+				return (pattern_based_reward + node.reward)/(total_pattern_visits/rollouts + node.visits)
+						+ c * Math.Sqrt(2*Math.Log(node.parent.visits) / node.visits);
+			}
+			else return double.PositiveInfinity;
+		}
+		public void reset_current_gen_unmatched()
+		{
+			foreach(int key in population.Keys)
+			{
+				current_gen_unmatched_indexes.AddLast(key);
+			}
 		}
 		public void end_generation()
 		{
-			current_gen_unmatched_indexes = population.Keys.ToList();
+			reset_current_gen_unmatched();
+			//remove deleted individual's indexes from the nodes?
 		}
 }
 public class MCTSNode
@@ -406,7 +441,7 @@ public class MCTSNode
 		public Dictionary<int, MCTSNode> children = new Dictionary<int, MCTSNode>();
 		public double reward; //cumulative reward
 		public bool is_root;
-		public List<int> matching_indexes = new List<int>();
+		public LinkedList<int> matching_indexes = new LinkedList<int>();
 
 	public MCTSNode(IGameState state, MCTSNode parent, bool is_root=false, int action_index = -1)
 		{
@@ -455,13 +490,6 @@ public class MCTSNode
 		{
 			return reward/visits;
 		}
-	public void update_matching_indexes(List<int> indexes)
-	{
-		if (indexes.Count > 0)
-		{
-			matching_indexes.AddRange(indexes);
-		}
-	}
 	public void update_max_tested_index(int max_index)
 	{
 		if (max_index > max_tested_index)
@@ -473,7 +501,7 @@ public class MCTSNode
 
 public class Pattern
 {
-	public int index, visits, age, updates_age;
+	public int index, visits, age, updates_age, nodes_matched;
 	public double cumulative_reward;
 	public IGameState matching_state;
 	public Dictionary<int, int> pattern = new Dictionary<int, int>();
@@ -528,6 +556,7 @@ public interface IGameState
 	int swap_player(int player_turn);
 	IGameState imagine_action(int action_index);
 	Dictionary<int, int> feature_vector {get;set;}
+	Dictionary<int, int[]> feature_index_to_board_coordinates {get;set;}
 }
 public class MNKGameState : IGameState
 {
@@ -543,7 +572,7 @@ public class MNKGameState : IGameState
 	private int offset;
 	public int[][] board {get; set;}
 	public Dictionary<int, int> feature_vector {get;set;}= new Dictionary<int, int>();
-	public Dictionary<int, int[]> feature_index_to_board_coordinates = new Dictionary<int, int[]>();
+	public Dictionary<int, int[]> feature_index_to_board_coordinates {get;set;} = new Dictionary<int, int[]>();
 	public int[][] coordinates_to_feature_index;
 	public List<IAction> available_actions {get; set; }= new List<IAction>();
 	public void set_initial_state()
