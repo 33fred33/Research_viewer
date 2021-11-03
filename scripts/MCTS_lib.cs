@@ -216,11 +216,10 @@ public class AgentMCTS : IAgent
 }
 public class AgentEPAMCTS : AgentMCTS
 {
-	public int active_pop_size, postulant_pop_size, individuals_count, mutation_growth, mutation_shrink, tournament_size, max_complexity, max_initial_complexity, random_shrink, random_growth, generation;
+	public int active_pop_size, pop_size, individuals_count, mutation_growth, mutation_shrink, tournament_size, max_complexity, max_initial_complexity, random_shrink, random_growth, generation;
 	public double mutation_rate, elitism;
-	public Dictionary<int,Pattern> active_population = new Dictionary<int, Pattern>();
 	public Dictionary<int,Pattern> population = new Dictionary<int, Pattern>();
-	public List<int> current_gen_unmatched_indexes = new List<int>();
+	public LinkedList<int> current_gen_unmatched_indexes = new LinkedList<int>();
 	//public LinkedList<int> current_gen_unmatched_indexes = new LinkedList<int>();
 	public AgentEPAMCTS(Random fixed_rand = null
 				,double c = 1
@@ -233,7 +232,7 @@ public class AgentEPAMCTS : AgentMCTS
 				//ea params
 				,double selection_c = 0.1
 				,int active_pop_size = 100
-				,int postulant_pop_size = 100
+				,int pop_size = 100
 				,int max_initial_complexity = 3
 				,int max_complexity = 5
 				,double mutation_rate = 0.5
@@ -251,7 +250,7 @@ public class AgentEPAMCTS : AgentMCTS
 			this.draw_value = draw_value;
 			this.lose_value = lose_value;
 			this.active_pop_size = active_pop_size;
-			this.postulant_pop_size = postulant_pop_size;
+			this.pop_size = pop_size;
 			this.max_initial_complexity = max_initial_complexity;
 			this.max_complexity = max_complexity;
 			this.mutation_rate = mutation_rate;
@@ -292,26 +291,73 @@ public class AgentEPAMCTS : AgentMCTS
 		}
 		public override MCTSNode selection(MCTSNode node)
 		{
-			List<int> matches = node_matches(node);
-			foreach (int pattern_idx in matches)
-			{
-				current_gen_unmatched_indexes.Remove(pattern_idx);
-			}
+			reset_current_gen_unmatched();
 			while (!node.is_leaf())
 			{
 				node = select_UCB(node);
-				//node.prior_reward = 0;
-				//node.prior_visits = 0;
-				matches = node_matches(node);
-				
-				foreach (int pattern_idx in matches)
-				{
-					current_gen_unmatched_indexes.Remove(pattern_idx); //why youuu?
-					node.prior_reward += population[pattern_idx].cumulative_reward;
-					node.prior_visits += population[pattern_idx].visits;
-				}
+				path_node_matches(node, current_gen_unmatched_indexes);
 			}
 			return node;
+		}
+		public override MCTSNode expansion(MCTSNode node)
+		{
+			if (node.state.terminal) return node;
+			var duplicate_state = node.state.duplicate();
+			List<int> available_action_indexes = new List<int>();
+			for (int i = 0; i < node.state.available_actions.Count; i++) available_action_indexes.Add(i);
+			foreach (int i in node.children.Keys) available_action_indexes.Remove(i);
+			int selection_index = rand.Next(available_action_indexes.Count);
+			int action_index = available_action_indexes[selection_index];
+			duplicate_state.make_action(action_index);
+			MCTSNode new_node = node.add_child(duplicate_state, action_index);
+			path_node_matches(new_node, current_gen_unmatched_indexes);
+			return new_node;
+		}
+		public double rollout_test(MCTSNode node, int sim_rollouts) //not in use, too expensive!
+		{
+			if(node.state.terminal) return result_to_reward(node.state);
+			double reward;
+			double total_reward = 0;
+			IGameState state;
+			List<int> current_rollout_matches = new List<int>();
+			List<int> matches = new List<int>();
+			
+			for (int i =0; i<sim_rollouts; i++)
+			{
+				state = node.state.duplicate();
+				current_rollout_matches.Clear();
+				LinkedList<int> current_rollout_unmatched_indexes = new LinkedList<int>(current_gen_unmatched_indexes);
+				while (!state.terminal)
+				{
+					state.make_random_action();
+					matches = state_matches(state, current_rollout_unmatched_indexes);
+					current_rollout_matches.AddRange(matches);
+					foreach (int pattern_idx in matches)
+					{
+						current_rollout_unmatched_indexes.Remove(pattern_idx);
+					}
+				}
+				reward = result_to_reward(state);
+				total_reward += reward;
+				foreach (int idx in current_rollout_matches)
+				{
+					population[idx].update_reward(reward, 1);
+				}
+			}
+			return total_reward;
+		}
+		public override void backpropagate(MCTSNode node, double total_reward, int sim_rollouts)
+		{
+			double average_reward = total_reward/sim_rollouts;
+			while (!node.is_root)
+			{
+				update_matched_individuals(node.current_gen_matching_indexes, average_reward);
+				update_prior(node);
+				if (node.state.player_turn == root_node.state.player_turn) node.update_reward(-average_reward);
+				else node.update_reward(average_reward);
+				node = node.parent;
+			}
+			node.update_reward(average_reward);
 		}
 		public Dictionary<int, int> random_uniform_pattern(IGameState state)
 		{
@@ -333,13 +379,6 @@ public class AgentEPAMCTS : AgentMCTS
 			}
 			return pattern;
 		}
-		public Pattern new_random_uniform_individual(IGameState state)
-		{
-			var state_tuple = state.get_random_future_state();
-			Pattern ind = create_individual(random_uniform_pattern(state_tuple.random_state), state_tuple.random_state);
-			ind.update_reward(result_to_reward(state_tuple.final_state),1);
-			return ind;
-		}
 		public Pattern create_individual(Dictionary<int, int> pattern, IGameState state)
 		{
 			Pattern ind = new Pattern(pattern, individuals_count, state);
@@ -351,16 +390,17 @@ public class AgentEPAMCTS : AgentMCTS
 			IGameState state = node.state;
 			double collective_reward = 0;
 			Dictionary<int,Pattern> population = new Dictionary<int,Pattern>();
-			for (int i = 0; i < postulant_pop_size; i++)
+			for (int i = 0; i < pop_size; i++)
 			{
-				Pattern ind = new_random_uniform_individual(state);
+				var state_tuple = state.get_random_future_state();
+				Pattern ind = create_individual(random_uniform_pattern(state_tuple.random_state), state_tuple.random_state);
 				population[ind.index] = ind; 
-				collective_reward += population[ind.index].cumulative_reward;
+				collective_reward += result_to_reward(state_tuple.final_state);
 			}
 			//to avoid having uneven rewards given different amount of rollouts
-			if (postulant_pop_size < rollouts)
+			if (pop_size < rollouts)
 			{
-				for (int i = 0; i < (rollouts - postulant_pop_size); i++)
+				for (int i = 0; i < (rollouts - pop_size); i++)
 				{
 					collective_reward += result_to_reward(node.state.random_game());
 				}
@@ -383,7 +423,7 @@ public class AgentEPAMCTS : AgentMCTS
 			}
 			return true;
 		}
-		public List<int> node_matches(MCTSNode node)
+		public List<int> state_matches(IGameState state, LinkedList<int> indexes)
 		{
 			//Find matches -> pror wont be updated for existing patterns if not resetted
 			/*
@@ -416,15 +456,10 @@ public class AgentEPAMCTS : AgentMCTS
 
 			//version 2 -> prior can be doubled if not resetted. Increases with pattern complexity
 			List<int> matches = new List<int>();
-			node.prior_reward = 0;
-			node.prior_visits = 0;
-			foreach (var ind in population)
+			foreach (var idx in indexes)
 			{
-				if (pattern_match(ind.Value.pattern, node.state)){
-					matches.Add(ind.Key);
-					ind.Value.nodes_matched++;
-					node.prior_reward += ind.Value.cumulative_reward;
-					node.prior_visits += ind.Value.visits;
+				if (pattern_match(population[idx].pattern, state)){
+					matches.Add(idx);
 				}
 			}
 			
@@ -432,23 +467,61 @@ public class AgentEPAMCTS : AgentMCTS
 		}
 		public override double exploitation_value(MCTSNode node)
 		{
-			return (node.prior_reward/rollouts + node.reward)/(node.prior_visits/rollouts + node.visits);
+			//GD.Print("node.prior", node.prior_reward, " ", node.prior_visits); 
+			return node.average_reward() + node.prior_reward/(node.prior_visits*pop_size);
+			//return (node.prior_reward/rollouts + node.reward)/(node.prior_visits + node.visits);
 		}
 		public void reset_current_gen_unmatched()
 		{
 			current_gen_unmatched_indexes.Clear();
 			foreach(int key in population.Keys)
 			{
-				//current_gen_unmatched_indexes.AddLast(key);
-				current_gen_unmatched_indexes.Add(key);
+				//current_gen_unmatched_indexes.Add(key);
+				current_gen_unmatched_indexes.AddLast(key);
 			}
 		}
 		public void end_generation()
 		{
-			reset_current_gen_unmatched();
+			foreach(var ind in population)
+			{
+				ind.Value.age++;
+			}
 			//remove deleted individual's indexes from the nodes?
 		}
-
+		public void path_node_matches(MCTSNode node, LinkedList<int> population_indexes)
+		{
+			//If a node doesnt get an ind as prio, none of its siblings did either
+			List<int> matches = state_matches(node.state, population_indexes);
+			node.current_gen_matching_indexes.AddRange(matches);
+			foreach (int pattern_idx in matches)
+			{
+				current_gen_unmatched_indexes.Remove(pattern_idx);
+				population[pattern_idx].nodes_matched++;
+				population[pattern_idx].matching_state = node.state; //updates the matching state with the latest match
+			}
+		}
+		public void update_prior(MCTSNode node)
+		{
+			node.prior_reward = 0;
+			node.prior_visits = 0;
+			foreach (int pattern_idx in node.current_gen_matching_indexes)
+			{
+				node.prior_reward += population[pattern_idx].cumulative_reward;
+				node.prior_visits += population[pattern_idx].visits;
+			}
+			if (root_node.state.player_turn == node.state.player_turn)
+			{
+				node.prior_reward = -node.prior_reward;
+			}
+			node.current_gen_matching_indexes.Clear();
+		}
+		public void update_matched_individuals(List<int> population_indexes, double average_reward)
+		{
+			foreach (int idx in population_indexes)
+			{
+				population[idx].update_reward(average_reward, 1);
+			}
+		}
 }
 public class MCTSNode
 {
@@ -460,7 +533,7 @@ public class MCTSNode
 		public Dictionary<int, MCTSNode> children = new Dictionary<int, MCTSNode>();
 		public double reward, prior_reward; //cumulative reward
 		public bool is_root;
-		public LinkedList<int> matching_indexes = new LinkedList<int>();
+		public List<int> current_gen_matching_indexes = new List<int>();
 
 	public MCTSNode(IGameState state, MCTSNode parent, bool is_root=false, int action_index = -1)
 		{
@@ -503,20 +576,13 @@ public class MCTSNode
 					+ ", AvgReward " + Convert.ToString(average_reward()) 
 					+ ", Actions " + Convert.ToString(state.available_actions.Count)
 					+ ", Children " + Convert.ToString(children.Count)
-					+ ", N_Matches" + Convert.ToString(matching_indexes.Count); 
+					+ ", N_Matches" + Convert.ToString(current_gen_matching_indexes.Count); 
 			return s;
 		}
 	public double average_reward()
 		{
 			return reward/visits;
 		}
-	public void update_max_tested_index(int max_index)
-	{
-		if (max_index > max_tested_index)
-		{
-			max_tested_index = max_index;
-		}
-	}
 }
 
 public class Pattern
@@ -570,7 +636,7 @@ public interface IGameState
 	void make_action(int action_index);
 	void make_random_action();
 	List<IAction> available_actions {get;set;}
-	IGameState duplicate();
+	IGameState duplicate(); //didnt know about ICloneable
 	(IGameState random_state, IGameState final_state) get_random_future_state();
 	IGameState random_game();
 	int swap_player(int player_turn);
