@@ -468,13 +468,14 @@ public class Main_control : Control
 		}
 	public void mcts_iterate()
 		{
+			DateTime start_time = DateTime.UtcNow; 
 			AgentMCTS tagent = (AgentMCTS)current_agent();
 			for (int i = 0; i < (int)N_iterations.Value; i++)
 			{
 				tagent.simulation();
 			}
 			view_agent_info((IAgent)tagent);
-
+			GD.Print("Executed in " + Convert.ToInt32((DateTime.UtcNow - start_time).TotalMilliseconds)  + " time.");
 		}
 	public void see_suggested_move()
 		{
