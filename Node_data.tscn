@@ -49,49 +49,58 @@ mouse_filter = 1
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="Reward" type="Label" parent="."]
+[node name="Fitness" type="Label" parent="."]
 margin_left = 55.0
 margin_top = 3.0
-margin_right = 92.0
+margin_right = 86.0
+margin_bottom = 17.0
+mouse_filter = 1
+size_flags_horizontal = 3
+align = 1
+
+[node name="Reward" type="Label" parent="."]
+margin_left = 90.0
+margin_top = 3.0
+margin_right = 122.0
 margin_bottom = 17.0
 mouse_filter = 1
 size_flags_horizontal = 3
 align = 1
 
 [node name="Exploitation" type="Label" parent="."]
-margin_left = 96.0
+margin_left = 126.0
 margin_top = 3.0
-margin_right = 134.0
+margin_right = 157.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 align = 1
 
 [node name="Exploration" type="Label" parent="."]
-margin_left = 138.0
+margin_left = 161.0
 margin_top = 3.0
-margin_right = 175.0
+margin_right = 193.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 align = 1
 
 [node name="Visits" type="Label" parent="."]
-margin_left = 179.0
+margin_left = 197.0
 margin_top = 3.0
-margin_right = 217.0
+margin_right = 228.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 align = 1
 
 [node name="Children" type="Label" parent="."]
-margin_left = 221.0
+margin_left = 232.0
 margin_top = 3.0
-margin_right = 258.0
+margin_right = 264.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 align = 1
 
 [node name="Actions" type="Label" parent="."]
-margin_left = 262.0
+margin_left = 268.0
 margin_top = 3.0
 margin_right = 300.0
 margin_bottom = 17.0

@@ -200,7 +200,7 @@ custom_constants/separation = 0
 
 [node name="View" type="Label" parent="Tree_inspector/Tree_data/Headers"]
 margin_top = 3.0
-margin_right = 70.0
+margin_right = 60.0
 margin_bottom = 17.0
 mouse_filter = 1
 size_flags_horizontal = 3
@@ -208,48 +208,56 @@ text = "View"
 align = 1
 clip_text = true
 
-[node name="Reward_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 70.0
-margin_right = 140.0
+[node name="Fitness_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 60.0
+margin_right = 121.0
 margin_bottom = 20.0
 mouse_filter = 1
 size_flags_horizontal = 3
-text = "Rew"
+text = "Fitness"
+
+[node name="Reward_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
+margin_left = 121.0
+margin_right = 182.0
+margin_bottom = 20.0
+mouse_filter = 1
+size_flags_horizontal = 3
+text = "Reward"
 
 [node name="Exploitation" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 140.0
-margin_right = 210.0
+margin_left = 182.0
+margin_right = 242.0
 margin_bottom = 20.0
 mouse_filter = 1
 size_flags_horizontal = 3
 text = "Exploit"
 
 [node name="Exploration" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 210.0
-margin_right = 280.0
+margin_left = 242.0
+margin_right = 303.0
 margin_bottom = 20.0
 mouse_filter = 1
 size_flags_horizontal = 3
 text = "Explor"
 
 [node name="Visits_sort" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 280.0
-margin_right = 350.0
+margin_left = 303.0
+margin_right = 364.0
 margin_bottom = 20.0
 mouse_filter = 1
 size_flags_horizontal = 3
 text = "Visits"
 
 [node name="Children" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 350.0
-margin_right = 420.0
+margin_left = 364.0
+margin_right = 429.0
 margin_bottom = 20.0
 mouse_filter = 1
 size_flags_horizontal = 3
 text = "Children"
 
 [node name="Actions" type="Button" parent="Tree_inspector/Tree_data/Headers"]
-margin_left = 420.0
+margin_left = 429.0
 margin_right = 490.0
 margin_bottom = 20.0
 mouse_filter = 1
@@ -317,7 +325,7 @@ custom_constants/separation = 0
 
 [node name="View" type="Label" parent="Pop_inspector/Pop_data/Headers"]
 margin_top = 3.0
-margin_right = 74.0
+margin_right = 75.0
 margin_bottom = 17.0
 size_flags_horizontal = 3
 text = "View"
@@ -325,39 +333,39 @@ align = 1
 clip_text = true
 
 [node name="Age_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 74.0
-margin_right = 148.0
+margin_left = 75.0
+margin_right = 151.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Age"
 
 [node name="Visits_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 148.0
-margin_right = 222.0
+margin_left = 151.0
+margin_right = 226.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Visits"
 
 [node name="Fitness_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 222.0
-margin_right = 296.0
+margin_left = 226.0
+margin_right = 302.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Fitness"
 
 [node name="Certainty_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 296.0
-margin_right = 378.0
+margin_left = 302.0
+margin_right = 377.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Avg reward"
+text = "Reward"
 
 [node name="Deviation_sort" type="Button" parent="Pop_inspector/Pop_data/Headers"]
-margin_left = 378.0
+margin_left = 377.0
 margin_right = 453.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
-text = "Deviat"
+text = "Deviation"
 
 [connection signal="button_down" from="MCTS_menu/Selection" to="." method="mcts_selection"]
 [connection signal="button_down" from="MCTS_menu/View_selection" to="." method="view_selected_node"]
@@ -371,15 +379,18 @@ text = "Deviat"
 [connection signal="button_down" from="MCTS_menu/See_suggested" to="." method="see_suggested_move"]
 [connection signal="button_down" from="MCTS_menu/See_parent" to="." method="see_parent"]
 [connection signal="button_down" from="MCTS_menu/Takeback" to="." method="takeback"]
-[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Reward_sort" to="." method="sort_node_table_reward"]
-[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Exploitation" to="." method="sort_node_table_reward"]
-[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Exploration" to="." method="sort_node_table_reward"]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Fitness_sort" to="." method="sort_nodes" binds= [ "fitness" ]]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Reward_sort" to="." method="sort_nodes" binds= [ "reward" ]]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Exploitation" to="." method="sort_nodes" binds= [ "exploitation" ]]
+[connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Exploration" to="." method="sort_nodes" binds= [ "exploration" ]]
 [connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Visits_sort" to="." method="sort_node_table_visits"]
 [connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Children" to="." method="sort_node_table_visits"]
 [connection signal="button_down" from="Tree_inspector/Tree_data/Headers/Actions" to="." method="sort_node_table_visits"]
 [connection signal="button_down" from="Tree_inspector/Tree_data/Headers/UCB_sort" to="." method="sort_node_table_ucb"]
 [connection signal="button_down" from="Pop_inspector/Pop_data/Main_buttons/Update" to="." method="update_pop_table"]
 [connection signal="button_down" from="Pop_inspector/Pop_data/Main_buttons/Show_matches" to="." method="_on_Show_matches_button_down"]
-[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Visits_sort" to="." method="sort_ind_table_visits"]
-[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Fitness_sort" to="." method="sort_ind_table_fitness"]
-[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Deviation_sort" to="." method="sort_ind_table_deviation"]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Age_sort" to="." method="sort_individuals" binds= [ "age" ]]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Visits_sort" to="." method="sort_individuals" binds= [ "visits" ]]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Fitness_sort" to="." method="sort_individuals" binds= [ "fitness" ]]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Certainty_sort" to="." method="sort_individuals" binds= [ "reward" ]]
+[connection signal="button_down" from="Pop_inspector/Pop_data/Headers/Deviation_sort" to="." method="sort_individuals" binds= [ "deviation" ]]

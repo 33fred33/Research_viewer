@@ -159,81 +159,29 @@ public class Main_control : Control
 			}
 			node_table_list.Clear();
 		}
-	public void sort_node_table_ucb()
+	public void sort_nodes(string name)
+	{
+		AgentMCTS tagent = (AgentMCTS)current_agent();
+		node_table_list.Sort((n1, n2) => 
+		get_node_data(visible_node.children[Convert.ToInt32(n1.GetNode<Label>("Child_index").Text)], tagent, name)
+		.CompareTo(get_node_data(visible_node.children[Convert.ToInt32(n2.GetNode<Label>("Child_index").Text)], tagent, name)));
+		for (int i=0; i<node_table_list.Count; i++)
 		{
-			AgentMCTS tagent = (AgentMCTS)current_agent();
-			double safe_counter = 0.00000000001;
-			SortedList sorted_nodes = new SortedList();
-			foreach (HBoxContainer node_table_container in node_table_list)
-			{
-				Label node_index_label = node_table_container.GetNode<Label>("Child_index");
-				int child_index = Convert.ToInt32(node_index_label.Text);
-				try {sorted_nodes.Add(tagent.UCB(visible_node.children[child_index]) , node_table_container);}
-				catch
-				{
-					sorted_nodes.Add(tagent.UCB(visible_node.children[child_index]) + safe_counter, node_table_container);
-					safe_counter += 0.00000000001;
-				}
-			}
-			
-			int counter = 0;
-			for (int i=sorted_nodes.Count-1; i>=0; i--)
-			{
-				counter++;
-				tree_data.MoveChild((HBoxContainer)sorted_nodes.GetByIndex(i), counter+2);
-			}
-
+			tree_data.MoveChild(node_table_list[i], node_table_list.Count-i+1);
 		}
-	public void sort_node_table_visits()
-		{
-			double safe_counter = 0.00000000001;
-			SortedList sorted_nodes = new SortedList();
-			foreach (HBoxContainer node_table_container in node_table_list)
-			{
-				Label node_index_label = node_table_container.GetNode<Label>("Child_index");
-				int child_index = Convert.ToInt32(node_index_label.Text);
-				//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
-				try {sorted_nodes.Add((double)visible_node.children[child_index].visits , node_table_container);}
-				catch
-				{
-					sorted_nodes.Add((double)visible_node.children[child_index].visits + safe_counter, node_table_container);
-					safe_counter += 0.00000000001;
-				}
-			}
-			
-			int counter = 0;
-			for (int i=sorted_nodes.Count-1; i>=0; i--)
-			{
-				counter ++;
-				tree_data.MoveChild((HBoxContainer)sorted_nodes.GetByIndex(i), counter+2);
-			}
+	}
+	public double get_node_data(MCTSNode node, AgentMCTS tagent, string name)
+	{
+		if (name=="fitness") return tagent.UCB(node);
+		if (name=="reward") return node.reward;
+		if (name=="exploration") return tagent.exploration_value(node);
+		if (name=="exploitation") return tagent.exploitation_value(node);
+		if (name=="visits") return node.visits;
+		if (name=="children") return node.children.Count;
+		if (name=="actions") return node.state.available_actions.Count;
+		return 0;
 
-		}
-	public void sort_node_table_reward()
-		{
-			double safe_counter = 0.00000000001;
-			SortedList sorted_nodes = new SortedList();
-			foreach (HBoxContainer node_table_container in node_table_list)
-			{
-				Label node_index_label = node_table_container.GetNode<Label>("Child_index");
-				int child_index = Convert.ToInt32(node_index_label.Text);
-				//GD.Print(Convert.ToString(child_index), " ", node_index_label.Text);
-				try {sorted_nodes.Add(visible_node.children[child_index].average_reward() , node_table_container);}
-				catch
-				{
-					sorted_nodes.Add(visible_node.children[child_index].average_reward() + safe_counter, node_table_container);
-					safe_counter += 0.00000000001;
-				}
-			}
-			
-			int counter = 0;
-			for (int i=sorted_nodes.Count-1; i>=0; i--)
-			{
-				counter++;
-				tree_data.MoveChild((HBoxContainer)sorted_nodes.GetByIndex(i), counter+2);
-			}
-
-		}
+	}
 	public void view_in_node_table()//MCTS_node node)
 		{
 			clear_node_table();
@@ -281,18 +229,20 @@ public class Main_control : Control
 					
 					Label child_index = (Label)instance_node_inspector.GetNode<Label>("Child_index");
 					child_index.Text = Convert.ToString(child_node.Key);
+					Label node_fitness = (Label)instance_node_inspector.GetNode<Label>("Fitness");
+					node_fitness.Text = get_node_data(child_node.Value, tagent, "fitness").ToString("G5");
 					Label exploitation = (Label)instance_node_inspector.GetNode<Label>("Exploitation");
-					exploitation.Text = tagent.exploitation_value(child_node.Value).ToString("G5");
+					exploitation.Text = get_node_data(child_node.Value, tagent, "exploitation").ToString("G5");
 					Label exploration = (Label)instance_node_inspector.GetNode<Label>("Exploration");
-					exploration.Text = tagent.exploration_value(child_node.Value).ToString("G5");
+					exploration.Text = get_node_data(child_node.Value, tagent, "exploration").ToString("G5");
 					Label reward = (Label)instance_node_inspector.GetNode<Label>("Reward");
-					reward.Text = child_node.Value.average_reward().ToString("G5");
+					reward.Text = get_node_data(child_node.Value, tagent, "reward").ToString("G5");
 					Label visits = (Label)instance_node_inspector.GetNode<Label>("Visits");
-					visits.Text = Convert.ToString(child_node.Value.visits);
+					visits.Text = get_node_data(child_node.Value, tagent, "visits").ToString("G5");
 					Label children_label = (Label)instance_node_inspector.GetNode<Label>("Children");
-					children_label.Text = Convert.ToString(child_node.Value.children.Count);
+					children_label.Text = get_node_data(child_node.Value, tagent, "children").ToString("G5");
 					Label actions = (Label)instance_node_inspector.GetNode<Label>("Actions");
-					actions.Text = Convert.ToString(child_node.Value.state.available_actions.Count);
+					actions.Text = get_node_data(child_node.Value, tagent, "actions").ToString("G5");
 					
 					
 					tree_data.AddChild(instance_node_inspector);
@@ -335,7 +285,7 @@ public class Main_control : Control
 						visits_progress.Value = child_node.Value.visits;
 					}
 				}*/
-				sort_node_table_reward();
+				sort_nodes("fitness");
 			}
 		}
 	public void update_pop_table()
@@ -346,40 +296,30 @@ public class Main_control : Control
 			{
 				show_individual_data(ind.Value, tagent);
 			}
-			sort_ind_table_fitness();
+			sort_individuals("fitness");
 		}
-	public void sort_ind_table_fitness()
+	public void sort_individuals(string name)
+	{
+		//https://developerpublish.com/c-tips-and-tricks-17-sort-dictionary-by-its-value/
+		AgentEPAMCTS tagent = (AgentEPAMCTS)current_agent();
+		ind_table_list.Sort((i1, i2) => 
+		get_individual_data(tagent.population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)], tagent, name)
+		.CompareTo(get_individual_data(tagent.population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)], tagent, name)));
+		for (int i=0; i<ind_table_list.Count; i++)
 		{
-			//https://developerpublish.com/c-tips-and-tricks-17-sort-dictionary-by-its-value/
-			AgentEPAMCTS tagent = (AgentEPAMCTS)current_agent();
-			ind_table_list.Sort((i1, i2) => tagent.population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].fitness(tagent.root_node.average_reward())
-											.CompareTo(tagent.population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].fitness(tagent.root_node.average_reward())));
-			for (int i=0; i<ind_table_list.Count; i++)
-			{
-				pop_data.MoveChild(ind_table_list[i], ind_table_list.Count + 1 - i);
-			}
+			pop_data.MoveChild(ind_table_list[i], ind_table_list.Count + 1 - i);
+		}
 			
-		}
-	public void sort_ind_table_visits()
-		{
-			/*
-			ind_table_list.Sort((i1, i2) => mcts.postulant_population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].visits.CompareTo(mcts.postulant_population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].visits));
-			for (int i=0; i<ind_table_list.Count; i++)
-			{
-				pop_data.MoveChild(ind_table_list[i], ind_table_list.Count + 1 - i);
-			}
-			*/
-		}
-	public void sort_ind_table_deviation()
-		{
-			/*
-			ind_table_list.Sort((i1, i2) => mcts.postulant_population[Convert.ToInt32(i1.GetNode<Label>("Individual_index").Text)].average_deviation.CompareTo(mcts.postulant_population[Convert.ToInt32(i2.GetNode<Label>("Individual_index").Text)].average_deviation));
-			for (int i=0; i<ind_table_list.Count; i++)
-			{
-				pop_data.MoveChild(ind_table_list[i], ind_table_list.Count + 1 - i);
-			}
-			*/
-		}
+	}
+	public double get_individual_data(Pattern ind, AgentEPAMCTS tagent, string name)
+	{
+		if (name=="age") return ind.age;
+		if (name=="fitness") return ind.fitness(tagent.root_node.average_reward());
+		if (name=="reward") return ind.average_reward();
+		if (name=="deviation") return ind.deviation(tagent.root_node.average_reward());
+		if (name=="visits") return ind.visits;
+		return 0;
+	}
 	public void clear_ind_table()
 		{
 			foreach (Godot.HBoxContainer ind_data_container in ind_table_list)
@@ -608,28 +548,28 @@ public class Main_control : Control
 				show_individual_data(ind.Value, tagent);
 			}
 		}
-		sort_ind_table_fitness();
+		sort_individuals("fitness");
 	}
 	public void show_individual_data(Pattern ind, AgentEPAMCTS tagent)
 	{
 		Godot.HBoxContainer instance_ind_inspector = (HBoxContainer)ind_table.Instance();
-				instance_ind_inspector.Connect("view_individual", this, "view_individual");
-				instance_ind_inspector.Connect("exit_individual", this, "return_view_to_current_state");
-				instance_ind_inspector.Connect("view_matching_state", this, "view_matching_state");
-				Label ind_index = (Label)instance_ind_inspector.GetNode<Label>("Individual_index");
-				ind_index.Text = Convert.ToString(ind.index);
-				pop_data.AddChild(instance_ind_inspector);
-				ind_table_list.Add(instance_ind_inspector);
-				Label age = (Label)instance_ind_inspector.GetNode<Label>("Age");
-				age.Text = ind.age.ToString("G5");
-				Label visits = (Label)instance_ind_inspector.GetNode<Label>("Visits");
-				visits.Text = ind.visits.ToString("G5");
-				Label fitness = (Label)instance_ind_inspector.GetNode<Label>("Fitness");
-				fitness.Text = ind.fitness(tagent.root_node.average_reward()).ToString("G5");
-				Label significance = (Label)instance_ind_inspector.GetNode<Label>("Significance");
-				significance.Text = ind.average_reward().ToString("G5"); //mcts.selection_c * 
-				Label deviation = (Label)instance_ind_inspector.GetNode<Label>("Deviation");
-				deviation.Text = ind.deviation(tagent.root_node.average_reward()).ToString("G5"); 
+		instance_ind_inspector.Connect("view_individual", this, "view_individual");
+		instance_ind_inspector.Connect("exit_individual", this, "return_view_to_current_state");
+		instance_ind_inspector.Connect("view_matching_state", this, "view_matching_state");
+		Label ind_index = (Label)instance_ind_inspector.GetNode<Label>("Individual_index");
+		ind_index.Text = Convert.ToString(ind.index);
+		pop_data.AddChild(instance_ind_inspector);
+		ind_table_list.Add(instance_ind_inspector);
+		Label age = (Label)instance_ind_inspector.GetNode<Label>("Age");
+		age.Text = get_individual_data(ind, tagent, "age").ToString("G5");
+		Label visits = (Label)instance_ind_inspector.GetNode<Label>("Visits");
+		visits.Text = get_individual_data(ind, tagent, "visits").ToString("G5");
+		Label fitness = (Label)instance_ind_inspector.GetNode<Label>("Fitness");
+		fitness.Text = get_individual_data(ind, tagent, "fitness").ToString("G5");
+		Label significance = (Label)instance_ind_inspector.GetNode<Label>("Significance");
+		significance.Text = get_individual_data(ind, tagent, "reward").ToString("G5");
+		Label deviation = (Label)instance_ind_inspector.GetNode<Label>("Deviation");
+		deviation.Text = get_individual_data(ind, tagent, "deviation").ToString("G5"); 
 	}
 }
 
@@ -1771,6 +1711,5 @@ public class mnk_action
 		return the_duplicate;
 	}
 }
-
 
 
