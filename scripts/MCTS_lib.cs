@@ -225,8 +225,8 @@ public class AgentEPAMCTS : AgentMCTS
 				,double c = 1
 				,int rollouts = 100
 				,double win_value = 1
-				,double draw_value = 0.5
-				,double lose_value = 0
+				,double draw_value = 0
+				,double lose_value = -1
 				,string stop_condition = "iterations" //time, iterations
 				,double stop_condition_value = 1000 //time in milliseconds
 				//ea params
@@ -468,7 +468,7 @@ public class AgentEPAMCTS : AgentMCTS
 		public override double exploitation_value(MCTSNode node)
 		{
 			//GD.Print("node.prior", node.prior_reward, " ", node.prior_visits); 
-			return node.average_reward() + node.prior_reward/(node.prior_visits*pop_size);
+			return node.average_reward() + node.prior_reward/(node.prior_visits);
 			//return (node.prior_reward/rollouts + node.reward)/(node.prior_visits + node.visits);
 		}
 		public void reset_current_gen_unmatched()
@@ -482,10 +482,52 @@ public class AgentEPAMCTS : AgentMCTS
 		}
 		public void end_generation()
 		{
-			foreach(var ind in population)
+			Dictionary<int,Pattern> new_pop = new Dictionary<int, Pattern>();
+			Pattern tind;
+			List<int> ind_idx = population.Keys.ToList();
+			//Sort population from best to worst
+			ind_idx.Sort((i1, i2) => population[i2].fitness(root_node.average_reward())
+									.CompareTo(population[i1].fitness(root_node.average_reward())));
+			//Add elites
+			int elites = Convert.ToInt32(pop_size*elitism);
+			int added_inds_counter = 0;
+			for (int i=0; i<elites; i++)
+			{
+				tind = population[ind_idx[added_inds_counter]];
+				(bool matched, Pattern matched_individual) = is_duplicated(tind, new_pop);
+				if (matched) 
+				{
+					if (matched_individual.visits < tind.visits)
+					{
+						new_pop.Remove(matched_individual.index);
+						new_pop[tind.index] = tind;
+					}
+					else i--;
+				}
+				else
+				{
+					new_pop[tind.index] = tind;
+				}
+				added_inds_counter++;
+				if (added_inds_counter == population.Count) break;
+			}
+			//Elites become older
+			foreach(var ind in new_pop)
 			{
 				ind.Value.age++;
 			}
+
+			//Create offsprings
+			for (int i=new_pop.Count; i<pop_size; i++)
+			{
+				int selected_idx = ordered_tournament_selection(ind_idx, tournament_size);
+				tind = uniform_mutation(population[selected_idx], mutation_growth, mutation_shrink);
+				new_pop[tind.index] = tind;
+			}
+
+			//Final assignation
+			population = new_pop;
+
 			//remove deleted individual's indexes from the nodes?
 		}
 		public void path_node_matches(MCTSNode node, LinkedList<int> population_indexes)
@@ -521,6 +563,91 @@ public class AgentEPAMCTS : AgentMCTS
 			{
 				population[idx].update_reward(average_reward, 1);
 			}
+		}
+		public Pattern uniform_mutation(Pattern ind, int growth, int shrink)
+		{
+			Dictionary<int, int> new_pattern = new Dictionary<int, int>();
+			List<int> new_keys = new List<int>();
+			List<int> available_keys = new List<int>();
+			int key_index;
+			random_shrink = rand.Next(shrink+1);
+			random_growth = rand.Next(growth+1);
+			if (ind.pattern.Count + random_growth > ind.matching_state.feature_vector.Count) random_growth = ind.matching_state.feature_vector.Count - ind.pattern.Count;
+
+			//Building the list of available keys
+			foreach (var feature in ind.matching_state.feature_vector)
+			{
+				if (!ind.pattern.ContainsKey(feature.Key))
+				{
+					available_keys.Add(feature.Key);
+				}
+			}
+
+			//Include previous
+			if (ind.pattern.Count + random_growth >= ind.matching_state.feature_vector.Count) new_keys = ind.matching_state.feature_vector.Keys.ToList();
+			else new_keys = ind.pattern.Keys.ToList();
+
+			//Remove
+			for (int i = 0; i < random_shrink; i++)
+			{
+				if (new_keys.Count == 1) break;
+				key_index = rand.Next(new_keys.Count);
+				new_keys.RemoveAt(key_index);
+			}
+
+			//Add
+			for (int i = 0; i < random_growth; i++)
+			{
+				key_index = rand.Next(available_keys.Count);
+				new_keys.Add(available_keys[key_index]);
+				available_keys.Remove(available_keys[key_index]);
+			}
+
+			//Final build
+			foreach (int key in new_keys)
+			{
+				new_pattern[key] = ind.matching_state.feature_vector[key];
+			}
+			return create_individual(new_pattern, ind.matching_state);
+		}
+		public int ordered_tournament_selection(List<int> ordered_index_list, int t_size)
+		{
+			int temporal_idx;
+			int final_idx = 99999;
+			for (int i = 0; i<t_size; i++)
+			{
+				temporal_idx = rand.Next(ordered_index_list.Count);
+				if (temporal_idx < final_idx)
+				{
+					final_idx = temporal_idx;
+				}
+			}
+			return ordered_index_list[final_idx];
+		}
+		//Utilities
+		public bool same_dict(Dictionary<int, int> p1, Dictionary<int, int> p2)
+		{
+			if (p1.Count != p1.Count) return false;
+			foreach (var feature in p1)
+			{
+				if (p2.ContainsKey(feature.Key))
+				{
+					if (feature.Value != p2[feature.Key]) return false;
+				}
+				else return false;
+			}
+			return true;
+		}
+		public (bool matched, Pattern matched_ind) is_duplicated(Pattern ind, Dictionary<int, Pattern> pop)
+		{
+			foreach (var ind2 in pop)
+			{
+				if (same_dict(ind.pattern, ind2.Value.pattern))
+				{
+					return (true, ind2.Value);
+				}
+			}
+			return (false, ind);
 		}
 }
 public class MCTSNode
@@ -605,7 +732,7 @@ public class Pattern
 	}
 	public double deviation(double comparative_average_reward)
 	{
-		return Math.Abs(average_reward() - comparative_average_reward);
+		return average_reward() - comparative_average_reward;
 	}
 	public double average_reward()
 	{
@@ -613,7 +740,7 @@ public class Pattern
 	}
 	public double fitness(double comparative_average_reward)
 	{
-		return deviation(comparative_average_reward);
+		return Math.Abs(deviation(comparative_average_reward));
 	}
 }
 
