@@ -81,7 +81,7 @@ public class Main_control : Control
 		start_new_game();
 		//agents[current_state.player_turn] = new AgentMCTS(fixed_rand:rand);
 		agents[current_state.player_turn] = new AgentEPAMCTS(fixed_rand:rand);
-		agents[current_state.swap_player(current_state.player_turn)] = new AgentMCTS(fixed_rand:rand);
+		agents[current_state.swap_player(current_state.player_turn)] = new AgentEPAMCTS(fixed_rand:rand);
 		current_agent().fit(current_state);
 		view_agent_info(current_agent());
 		full_current_game[current_state.ply] = current_state;
@@ -173,7 +173,7 @@ public class Main_control : Control
 	public double get_node_data(MCTSNode node, AgentMCTS tagent, string name)
 	{
 		if (name=="fitness") return tagent.UCB(node);
-		if (name=="reward") return node.reward;
+		if (name=="reward") return node.average_reward();
 		if (name=="exploration") return tagent.exploration_value(node);
 		if (name=="exploitation") return tagent.exploitation_value(node);
 		if (name=="visits") return node.visits;
@@ -314,7 +314,7 @@ public class Main_control : Control
 	public double get_individual_data(Pattern ind, AgentEPAMCTS tagent, string name)
 	{
 		if (name=="age") return ind.age;
-		if (name=="fitness") return ind.fitness(tagent.root_node.average_reward());
+		if (name=="fitness") return ind.fitness(tagent.root_node.average_reward(),tagent.root_node.visits);
 		if (name=="reward") return ind.average_reward();
 		if (name=="deviation") return ind.deviation(tagent.root_node.average_reward());
 		if (name=="visits") return ind.visits;
@@ -502,6 +502,7 @@ public class Main_control : Control
 
 		//Update UI
 		view_game_state(current_state);
+		current_agent().fit(current_state);
 		view_agent_info(current_agent());
 	}
 	public void takeback()
@@ -514,28 +515,35 @@ public class Main_control : Control
 
 			//Update UI
 			view_game_state(current_state);
+			current_agent().fit(current_state);
 			view_agent_info(current_agent());
 		}
 	}
 	public void view_agent_info(IAgent tagent)
 	{
 		//ref https://stackoverflow.com/questions/3561202/check-if-instance-is-of-a-type
-		AgentEPAMCTS epamctsagent = tagent as AgentEPAMCTS;
-		if (epamctsagent != null)
+		if (!current_state.terminal)
 		{
-			view_node(epamctsagent.root_node);
-			view_in_node_table();
-			update_pop_table();
-		}
-		else{
-			AgentMCTS mctsagent = tagent as AgentMCTS;
-			if (mctsagent != null)
+			AgentEPAMCTS epamctsagent = tagent as AgentEPAMCTS;
+			if (epamctsagent != null)
 			{
-				view_node(mctsagent.root_node);
+				view_node(epamctsagent.root_node);
+				pop_inspector.Visible = true;
+				tree_inspector.Visible = true;
 				view_in_node_table();
+				update_pop_table();
+			}
+			else{
+				AgentMCTS mctsagent = tagent as AgentMCTS;
+				if (mctsagent != null)
+				{
+					view_node(mctsagent.root_node);
+					pop_inspector.Visible = false;
+					tree_inspector.Visible = true;
+					view_in_node_table();
+				}
 			}
 		}
-
 	}
 	private void _on_Show_matches_button_down()
 	{
@@ -570,6 +578,25 @@ public class Main_control : Control
 		significance.Text = get_individual_data(ind, tagent, "reward").ToString("G5");
 		Label deviation = (Label)instance_ind_inspector.GetNode<Label>("Deviation");
 		deviation.Text = get_individual_data(ind, tagent, "deviation").ToString("G5"); 
+	}
+	public void play_suggested()
+	{
+		AgentMCTS tagent = (AgentMCTS)current_agent();
+		if (tagent.root_node.children.Count > 0){
+			execute_action(tagent.recommendation_policy());
+		}
+	}
+	public void force_move()
+	{
+		if (!current_state.terminal)
+		{
+			AgentMCTS tagent = (AgentMCTS)current_agent();
+			tagent.fit(current_state);
+
+			DateTime start_time = DateTime.UtcNow; 
+			execute_action(tagent.predict());
+			GD.Print("Executed in " + Convert.ToInt32((DateTime.UtcNow - start_time).TotalMilliseconds)  + " time.");
+		}
 	}
 }
 
@@ -1711,5 +1738,3 @@ public class mnk_action
 		return the_duplicate;
 	}
 }
-
-

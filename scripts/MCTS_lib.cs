@@ -7,27 +7,8 @@ using System.Linq;
 public class MCTS_lib : Control
 {
 	public override void _Ready()
-	{
-		/*
-		IGameState test_state = (IGameState)new MNKGameState{m=3,n=3,k=3};
-		test_state.set_initial_state();
-		test_state.make_action(0);
-		IGameState dup_state = test_state.duplicate();
-		IGameState final_state = dup_state.random_game();
-		GD.Print("test_moves", test_state.available_actions.Count);
-		GD.Print("dup_moves", dup_state.available_actions.Count);
-		GD.Print("winner", dup_state.winner);
-		IAgent test_agent = (IAgent)new AgentMCTS();
-		*/
-		//int test_action_index = test_agent.best_action(test_state);
-		//test_state.make_action(test_action_index);
-	}
-
+	{}
 //  public override void _Process(float delta){ }
-	public void test_method()
-	{
-		GD.Print("Test method reached");
-	}
 }
 
 //----------------------------------------------------------------------
@@ -74,13 +55,13 @@ public class AgentMCTS : IAgent
 	public int rollouts {get; set;}
 	public Random rand { get; set;}
 	public AgentMCTS(Random fixed_rand = null
-				,double c = 1
+				,double c = 2
 				,int rollouts = 100
 				,double win_value = 1
-				,double draw_value = 0.5
-				,double lose_value = 0
+				,double draw_value = 0
+				,double lose_value = -1
 				,string stop_condition = "iterations" //time, iterations
-				,double stop_condition_value = 1000) //time in milliseconds5)
+				,double stop_condition_value = 500) //time in milliseconds5)
 		{
 			if (fixed_rand == null) rand = new Random();
 			else rand = fixed_rand;
@@ -174,7 +155,7 @@ public class AgentMCTS : IAgent
 	}
 	public virtual double rollout(MCTSNode node, int sim_rollouts)
 	{
-		if(node.state.terminal) return result_to_reward(node.state);
+		if(node.state.terminal) return sim_rollouts * result_to_reward(node.state);
 		double reward =0;
 		for (int i =0; i<sim_rollouts; i++)
 		{
@@ -222,22 +203,22 @@ public class AgentEPAMCTS : AgentMCTS
 	public LinkedList<int> current_gen_unmatched_indexes = new LinkedList<int>();
 	//public LinkedList<int> current_gen_unmatched_indexes = new LinkedList<int>();
 	public AgentEPAMCTS(Random fixed_rand = null
-				,double c = 1
+				,double c = 2
 				,int rollouts = 100
 				,double win_value = 1
 				,double draw_value = 0
 				,double lose_value = -1
 				,string stop_condition = "iterations" //time, iterations
-				,double stop_condition_value = 1000 //time in milliseconds
+				,double stop_condition_value = 500 //time in milliseconds
 				//ea params
 				,double selection_c = 0.1
 				,int active_pop_size = 100
 				,int pop_size = 100
 				,int max_initial_complexity = 3
 				,int max_complexity = 5
-				,double mutation_rate = 0.5
-				,double elitism = 0.5
-				,int mutation_growth = 2
+				,double mutation_rate = 0.3
+				,double elitism = 0.7
+				,int mutation_growth = 1
 				,int mutation_shrink = 2
 				,int tournament_size = 5)
 		{
@@ -287,7 +268,7 @@ public class AgentEPAMCTS : AgentMCTS
 			expanded_node = expansion(selected_node);
 			cumulative_reward = rollout(expanded_node, rollouts);
 			backpropagate(expanded_node, cumulative_reward, rollouts);
-			end_generation();
+			end_generation(cumulative_reward, rollouts);
 		}
 		public override MCTSNode selection(MCTSNode node)
 		{
@@ -352,6 +333,7 @@ public class AgentEPAMCTS : AgentMCTS
 			while (!node.is_root)
 			{
 				update_matched_individuals(node.current_gen_matching_indexes, average_reward);
+				//node.current_gen_matching_indexes.Clear();
 				update_prior(node);
 				if (node.state.player_turn == root_node.state.player_turn) node.update_reward(-average_reward);
 				else node.update_reward(average_reward);
@@ -468,7 +450,8 @@ public class AgentEPAMCTS : AgentMCTS
 		public override double exploitation_value(MCTSNode node)
 		{
 			//GD.Print("node.prior", node.prior_reward, " ", node.prior_visits); 
-			return node.average_reward() + node.prior_reward/(node.prior_visits);
+			
+			return node.average_reward() + safe_division_zero(node.prior_reward, node.prior_visits);
 			//return (node.prior_reward/rollouts + node.reward)/(node.prior_visits + node.visits);
 		}
 		public void reset_current_gen_unmatched()
@@ -480,14 +463,14 @@ public class AgentEPAMCTS : AgentMCTS
 				current_gen_unmatched_indexes.AddLast(key);
 			}
 		}
-		public void end_generation()
+		public void end_generation(double current_gen_reward, int sim_rollouts)
 		{
 			Dictionary<int,Pattern> new_pop = new Dictionary<int, Pattern>();
 			Pattern tind;
 			List<int> ind_idx = population.Keys.ToList();
 			//Sort population from best to worst
-			ind_idx.Sort((i1, i2) => population[i2].fitness(root_node.average_reward())
-									.CompareTo(population[i1].fitness(root_node.average_reward())));
+			ind_idx.Sort((i1, i2) => population[i2].fitness(root_node.average_reward(), root_node.visits)
+									.CompareTo(population[i1].fitness(root_node.average_reward(), root_node.visits)));
 			//Add elites
 			int elites = Convert.ToInt32(pop_size*elitism);
 			int added_inds_counter = 0;
@@ -522,6 +505,7 @@ public class AgentEPAMCTS : AgentMCTS
 			{
 				int selected_idx = ordered_tournament_selection(ind_idx, tournament_size);
 				tind = uniform_mutation(population[selected_idx], mutation_growth, mutation_shrink);
+				tind.update_reward(current_gen_reward/sim_rollouts, 1);
 				new_pop[tind.index] = tind;
 			}
 
@@ -539,7 +523,11 @@ public class AgentEPAMCTS : AgentMCTS
 			{
 				current_gen_unmatched_indexes.Remove(pattern_idx);
 				population[pattern_idx].nodes_matched++;
-				population[pattern_idx].matching_state = node.state; //updates the matching state with the latest match
+				//population[pattern_idx].matching_state = node.state; //updates the matching state with the latest match
+			}
+			if (root_node.state.player_turn == node.state.player_turn)
+			{
+				node.prior_reward = -node.prior_reward;
 			}
 		}
 		public void update_prior(MCTSNode node)
@@ -649,6 +637,11 @@ public class AgentEPAMCTS : AgentMCTS
 			}
 			return (false, ind);
 		}
+		public double safe_division_zero(double num, double den)
+		{
+			return (den == 0) ? 0 : num / den;
+		}
+		
 }
 public class MCTSNode
 {
@@ -738,9 +731,14 @@ public class Pattern
 	{
 		return cumulative_reward/visits;
 	}
-	public double fitness(double comparative_average_reward)
+	public double fitness(double comparative_average_reward, int comparative_visits)
 	{
-		return Math.Abs(deviation(comparative_average_reward));
+		//return Math.Abs(deviation(comparative_average_reward));
+		return (Math.Abs(deviation(comparative_average_reward))/Math.Sqrt(safe_division_zero(1, visits) + safe_division_zero(1,comparative_visits)));
+	}	
+	public double safe_division_zero(double num, double den)
+	{
+		return (den == 0) ? 0 : num / den;
 	}
 }
 
@@ -867,12 +865,10 @@ public class MNKGameState : IGameState
 		else
 		{
 			if (available_actions.Count == 0) terminal = true;
-			else
-			{
-				player_turn = swap_player(player_turn);
-				ply++;
-			}
 		}
+
+		player_turn = swap_player(player_turn);
+		ply++;
 	}
 	public void make_random_action()
 	{
@@ -982,3 +978,4 @@ public class MNKAction : IAction
 		return the_duplicate;
 	}
 }
+
