@@ -100,9 +100,9 @@ public class AgentMCTS : IAgent
 		double max_value = 0;
 		foreach (var child_node in root_node.children)
 		{
-			if (child_node.Value.visits > max_value)
+			if (child_node.Value.average_reward() > max_value)
 			{
-				max_value = child_node.Value.visits;
+				max_value = child_node.Value.average_reward();
 				max_key = child_node.Key;
 			}
 		}
@@ -168,8 +168,7 @@ public class AgentMCTS : IAgent
 		double average_reward = total_reward/sim_rollouts;
 		while (!node.is_root)
 		{
-			if (node.state.player_turn == root_node.state.player_turn) node.update_reward(-average_reward);
-			else node.update_reward(average_reward);
+			node.update_reward(sign_multiplier(node)*average_reward);
 			node = node.parent;
 		}
 		node.update_reward(average_reward);
@@ -193,6 +192,12 @@ public class AgentMCTS : IAgent
 	public virtual double exploitation_value(MCTSNode node)
 	{
 		return node.average_reward();
+	}
+	public int sign_multiplier(MCTSNode node)
+	{
+		if (node.state.player_turn != root_node.state.player_turn) return 1;
+		if (node.is_root) return 1;
+		return -1;
 	}
 }
 public class AgentEPAMCTS : AgentMCTS
@@ -218,9 +223,9 @@ public class AgentEPAMCTS : AgentMCTS
 				,int max_complexity = 5
 				,double mutation_rate = 0.3
 				,double elitism = 0.7
-				,int mutation_growth = 1
+				,int mutation_growth = 2
 				,int mutation_shrink = 2
-				,int tournament_size = 5)
+				,int tournament_size = 4)
 		{
 			if (fixed_rand == null) rand = new Random();
 			else rand = fixed_rand;
@@ -322,24 +327,28 @@ public class AgentEPAMCTS : AgentMCTS
 				total_reward += reward;
 				foreach (int idx in current_rollout_matches)
 				{
-					population[idx].update_reward(reward, 1);
+					population[idx].update_reward(reward);
 				}
 			}
 			return total_reward;
 		}
 		public override void backpropagate(MCTSNode node, double total_reward, int sim_rollouts)
 		{
+			double deviation;
 			double average_reward = total_reward/sim_rollouts;
+			node.update_reward(sign_multiplier(node)*average_reward);
+			
 			while (!node.is_root)
 			{
-				update_matched_individuals(node.current_gen_matching_indexes, average_reward);
-				//node.current_gen_matching_indexes.Clear();
-				update_prior(node);
-				if (node.state.player_turn == root_node.state.player_turn) node.update_reward(-average_reward);
-				else node.update_reward(average_reward);
+				node.parent.update_reward(sign_multiplier(node.parent)*average_reward);
+				deviation = sign_multiplier(node)*node.average_reward() - sign_multiplier(node.parent)*node.parent.average_reward();
+				update_reward_matched_individuals(node.current_gen_matching_indexes, average_reward);
+				update_immediate_deviation_matched_individuals(node.current_gen_matching_indexes, deviation);
+				update_node_prior(node);
+
+				node.current_gen_matching_indexes.Clear();
 				node = node.parent;
 			}
-			node.update_reward(average_reward);
 		}
 		public Dictionary<int, int> random_uniform_pattern(IGameState state)
 		{
@@ -367,7 +376,7 @@ public class AgentEPAMCTS : AgentMCTS
 			individuals_count++;
 			return ind;
 		}
-		public Dictionary<int,Pattern> random_population(MCTSNode node)
+		public Dictionary<int,Pattern> random_state_population(MCTSNode node)
 		{
 			IGameState state = node.state;
 			double collective_reward = 0;
@@ -390,9 +399,20 @@ public class AgentEPAMCTS : AgentMCTS
 			node.update_reward(collective_reward/rollouts);
 			return population;
 		}
+		public Dictionary<int,Pattern> root_state_population(MCTSNode node)
+		{
+			IGameState state = node.state;
+			Dictionary<int,Pattern> population = new Dictionary<int,Pattern>();
+			for (int i = 0; i < pop_size; i++)
+			{
+				Pattern ind = create_individual(random_uniform_pattern(node.state), node.state);
+				population[ind.index] = ind;
+			}
+			return population;
+		}
 		public void initialize_population()
 		{
-			population = random_population(root_node);
+			population = root_state_population(root_node);
 		}
 		public bool pattern_match(Dictionary<int,int> pattern, IGameState state)
 		{
@@ -407,36 +427,6 @@ public class AgentEPAMCTS : AgentMCTS
 		}
 		public List<int> state_matches(IGameState state, LinkedList<int> indexes)
 		{
-			//Find matches -> pror wont be updated for existing patterns if not resetted
-			/*
-			int max_key_in_population = population.Keys.Max();
-			List<int> matches = new List<int>();
-			foreach (var ind in population)
-			{
-				if (ind.Key > node.max_tested_index){
-					if (pattern_match(ind.Value.pattern, node.state)){
-						matches.Add(ind.Key);
-						ind.Value.nodes_matched++;
-					}
-				}
-				else{
-					if (node.matching_indexes.Contains(ind.Key)){
-						matches.Add(ind.Key);
-					}
-				}
-			}
-
-			if (node.max_tested_index < max_key_in_population){
-				//New node max index
-				node.max_tested_index = max_key_in_population;
-				//Reset node's matching indexes
-				node.matching_indexes.Clear();
-				foreach (int idx in matches){
-					node.matching_indexes.AddFirst(idx);
-				}
-			}*/
-
-			//version 2 -> prior can be doubled if not resetted. Increases with pattern complexity
 			List<int> matches = new List<int>();
 			foreach (var idx in indexes)
 			{
@@ -444,7 +434,6 @@ public class AgentEPAMCTS : AgentMCTS
 					matches.Add(idx);
 				}
 			}
-			
 			return matches;
 		}
 		public override double exploitation_value(MCTSNode node)
@@ -497,7 +486,7 @@ public class AgentEPAMCTS : AgentMCTS
 			//Elites become older
 			foreach(var ind in new_pop)
 			{
-				ind.Value.age++;
+				ind.Value.make_older();
 			}
 
 			//Create offsprings
@@ -505,7 +494,7 @@ public class AgentEPAMCTS : AgentMCTS
 			{
 				int selected_idx = ordered_tournament_selection(ind_idx, tournament_size);
 				tind = uniform_mutation(population[selected_idx], mutation_growth, mutation_shrink);
-				tind.update_reward(current_gen_reward/sim_rollouts, 1);
+				//tind.update_reward(current_gen_reward/sim_rollouts);
 				new_pop[tind.index] = tind;
 			}
 
@@ -522,34 +511,33 @@ public class AgentEPAMCTS : AgentMCTS
 			foreach (int pattern_idx in matches)
 			{
 				current_gen_unmatched_indexes.Remove(pattern_idx);
-				population[pattern_idx].nodes_matched++;
-				//population[pattern_idx].matching_state = node.state; //updates the matching state with the latest match
-			}
-			if (root_node.state.player_turn == node.state.player_turn)
-			{
-				node.prior_reward = -node.prior_reward;
+				population[pattern_idx].update_visits(1);
+				population[pattern_idx].matching_state = node.state; //updates the matching state with the latest match
 			}
 		}
-		public void update_prior(MCTSNode node)
+		public void update_node_prior(MCTSNode node)
 		{
 			node.prior_reward = 0;
 			node.prior_visits = 0;
 			foreach (int pattern_idx in node.current_gen_matching_indexes)
 			{
-				node.prior_reward += population[pattern_idx].cumulative_reward;
+				node.prior_reward += sign_multiplier(node)*population[pattern_idx].cumulative_reward;
+				node.prior_deviation += sign_multiplier(node)*population[pattern_idx].cumulative_immediate_deviation;
 				node.prior_visits += population[pattern_idx].visits;
 			}
-			if (root_node.state.player_turn == node.state.player_turn)
-			{
-				node.prior_reward = -node.prior_reward;
-			}
-			node.current_gen_matching_indexes.Clear();
 		}
-		public void update_matched_individuals(List<int> population_indexes, double average_reward)
+		public void update_immediate_deviation_matched_individuals(List<int> population_indexes, double deviation)
 		{
 			foreach (int idx in population_indexes)
 			{
-				population[idx].update_reward(average_reward, 1);
+				population[idx].update_immediate_deviation(deviation);
+			}
+		}
+		public void update_reward_matched_individuals(List<int> population_indexes, double average_reward)
+		{
+			foreach (int idx in population_indexes)
+			{
+				population[idx].update_reward(average_reward);
 			}
 		}
 		public Pattern uniform_mutation(Pattern ind, int growth, int shrink)
@@ -651,7 +639,7 @@ public class MCTSNode
 		public IGameState state;
 		public MCTSNode parent;
 		public Dictionary<int, MCTSNode> children = new Dictionary<int, MCTSNode>();
-		public double reward, prior_reward; //cumulative reward
+		public double reward, prior_reward, prior_deviation; //cumulative reward
 		public bool is_root;
 		public List<int> current_gen_matching_indexes = new List<int>();
 
@@ -708,7 +696,7 @@ public class MCTSNode
 public class Pattern
 {
 	public int index, visits, age, updates_age, nodes_matched;
-	public double cumulative_reward;
+	public double cumulative_reward, cumulative_immediate_deviation;
 	public IGameState matching_state;
 	public Dictionary<int, int> pattern = new Dictionary<int, int>();
 
@@ -718,10 +706,13 @@ public class Pattern
 			this.index = index;
 			this.matching_state = state;
 		}
-	public void update_reward(double total_reward, int visits)
+	public void update_immediate_deviation(double deviation)
+	{
+		cumulative_immediate_deviation += deviation;
+	}
+	public void update_reward(double total_reward)
 	{
 		cumulative_reward += total_reward;
-		this.visits += visits;
 	}
 	public double deviation(double comparative_average_reward)
 	{
@@ -731,11 +722,23 @@ public class Pattern
 	{
 		return cumulative_reward/visits;
 	}
+	public double average_immediate_deviation(){
+		return safe_division_zero(cumulative_immediate_deviation, visits);
+	}
 	public double fitness(double comparative_average_reward, int comparative_visits)
 	{
 		//return Math.Abs(deviation(comparative_average_reward));
 		return (Math.Abs(deviation(comparative_average_reward))/Math.Sqrt(safe_division_zero(1, visits) + safe_division_zero(1,comparative_visits)));
+		//return Math.Abs(average_immediate_deviation())/Math.Sqrt(safe_division_zero(1, visits) + safe_division_zero(1,comparative_visits));
 	}	
+	public void make_older()
+	{
+		age += 1;
+	}
+	public void update_visits(int visits)
+	{
+		this.visits += visits;
+	}
 	public double safe_division_zero(double num, double den)
 	{
 		return (den == 0) ? 0 : num / den;
@@ -777,16 +780,16 @@ public class MNKGameState : IGameState
 	public int winner { get; set;}
 	public Random rand { get; set;} = new Random();
 	public int m, n, k;
-	private int count = 0;
-	private List<int> diag = new List<int>();
-	private List<int> inv_diag = new List<int>();
-	private int offset;
+	public int count = 0;
+	public List<int> diag = new List<int>();
+	public List<int> inv_diag = new List<int>();
+	public int offset;
 	public int[][] board {get; set;}
 	public Dictionary<int, int> feature_vector {get;set;}= new Dictionary<int, int>();
 	public Dictionary<int, int[]> feature_index_to_board_coordinates {get;set;} = new Dictionary<int, int[]>();
 	public int[][] coordinates_to_feature_index;
 	public List<IAction> available_actions {get; set; }= new List<IAction>();
-	public void set_initial_state()
+	public virtual void set_initial_state()
 	{
 		//Assign variables
 		terminal = false;
@@ -822,7 +825,7 @@ public class MNKGameState : IGameState
 			feature_vector[pair.Key] = board[pair.Value[1]][pair.Value[0]];
 		}
 	}
-	public void make_action(int action_index)
+	public virtual void make_action(int action_index)
 	{
 		MNKAction action = (MNKAction)available_actions[action_index];
 		board[action.y][action.x] = player_turn;
@@ -922,7 +925,7 @@ public class MNKGameState : IGameState
 		imagined_state.make_action(action_index);
 		return imagined_state;
 	}
-	public IGameState duplicate()
+	public virtual IGameState duplicate()
 	{
 		int[][] duplicate_board = new int[board.Length][];
 		for (int i = 0; i < board.Length; i++)
@@ -941,6 +944,265 @@ public class MNKGameState : IGameState
 		}
 
 		MNKGameState the_duplicate = new MNKGameState
+		{
+			m = m,
+			n = n,
+			k = k,
+			player_turn = player_turn,
+			ply = ply,
+			winner = winner,
+			board = duplicate_board,
+			available_actions = duplicate_actions,
+			terminal = terminal,
+			feature_index_to_board_coordinates = feature_index_to_board_coordinates,
+			coordinates_to_feature_index = coordinates_to_feature_index,
+			feature_vector = duplicate_feature_vector,
+			rand = rand
+		};
+		return (IGameState)the_duplicate;
+	}
+}
+public class Connect4 : MNKGameState, IGameState
+{
+	public int height_temp;
+	public override void set_initial_state()
+	{
+		m=7;
+		n=7;
+		k=4;
+
+		//Assign variables
+		terminal = false;
+		player_turn = 1;
+		ply = 1;
+		winner = 0;
+		//if (available_actions != null) {
+		available_actions.Clear();// }
+
+		//Initialize the board and available actions
+		int counter = 0;
+		board = new int[m][];
+		coordinates_to_feature_index = new int[m][];
+		for (int y = 0; y < m; y++)
+		{
+			board[y] = new int[n];
+			coordinates_to_feature_index[y] = new int[n];
+			for (int x = 0; x < n; x++)
+			{
+				if (y==m-1)
+				{
+					MNKAction action = new MNKAction(x,y);// { x = x , y = y };
+					available_actions.Add((IAction)action);
+				}
+				feature_index_to_board_coordinates[counter] = new int[] {x,y};
+				coordinates_to_feature_index[y][x] = counter;
+				counter ++;
+			}
+		}
+		set_feature_vector();
+	}
+	public override void make_action(int action_index)
+	{
+		MNKAction action = (MNKAction)available_actions[action_index];
+		board[action.y][action.x] = player_turn;
+		feature_vector[coordinates_to_feature_index[action.y][action.x]] = player_turn;
+
+		//Horizontal
+		if (k_line(board[action.y])) terminal = true;
+		//Vertical
+		if (!terminal)
+		{
+			var column = board
+				//.Where(o => (o != null && o.Count() > action.y))
+				.Select(o => o[action.x])
+				.ToArray();
+			if (k_line(column)) terminal = true;
+		}
+		//Diagonals
+		if (!terminal)
+		{
+			diag.Clear();
+			inv_diag.Clear(); //test speed versus declaration
+			offset = action.y - action.x;
+			for (int y = 0; y < m; y++)
+			{
+				for (int x = 0; x < n; x++)
+				{
+					if (y - x == offset) diag.Add(board[y][x]);
+					if (x + y == action.x + action.y) inv_diag.Add(board[y][x]);
+				}
+			}
+			if (k_line(diag.ToArray())) terminal = true;
+			if (!terminal) 
+			{ 
+				if (k_line(inv_diag.ToArray())) terminal = true; 
+			}
+		}
+
+		available_actions.RemoveAt(action_index);
+		
+		if (terminal) winner = player_turn;
+		else
+		{
+			height_temp = action.y - 1;
+			if (height_temp >= 0)
+			{
+				MNKAction new_action = new MNKAction(action.x,height_temp);
+				available_actions.Add((IAction)new_action);
+			}
+			if (available_actions.Count == 0) terminal = true;
+		}
+
+		player_turn = swap_player(player_turn);
+		ply++;
+	}
+	public override IGameState duplicate()
+	{
+		int[][] duplicate_board = new int[board.Length][];
+		for (int i = 0; i < board.Length; i++)
+		{
+			duplicate_board[i] = (int[])board[i].Clone();
+		}
+		List<IAction> duplicate_actions = new List<IAction>();
+		foreach (IAction action in available_actions)
+		{
+			duplicate_actions.Add(action.duplicate());
+		}
+		Dictionary<int, int> duplicate_feature_vector = new Dictionary<int, int>();
+		foreach (var feature in feature_vector)
+		{
+			duplicate_feature_vector[feature.Key] = feature.Value;
+		}
+
+		Connect4 the_duplicate = new Connect4
+		{
+			m = m,
+			n = n,
+			k = k,
+			player_turn = player_turn,
+			ply = ply,
+			winner = winner,
+			board = duplicate_board,
+			available_actions = duplicate_actions,
+			terminal = terminal,
+			feature_index_to_board_coordinates = feature_index_to_board_coordinates,
+			coordinates_to_feature_index = coordinates_to_feature_index,
+			feature_vector = duplicate_feature_vector,
+			rand = rand
+		};
+		return (IGameState)the_duplicate;
+	}
+}
+
+public class Othello : MNKGameState, IGameState
+{
+	public int height_temp;
+	public override void set_initial_state()
+	{
+		//Assign variables
+		terminal = false;
+		player_turn = 1;
+		ply = 1;
+		winner = 0;
+		//if (available_actions != null) {
+		available_actions.Clear();// }
+
+		//Initialize the board and available actions
+		int counter = 0;
+		board = new int[m][];
+		coordinates_to_feature_index = new int[m][];
+		for (int y = 0; y < m; y++)
+		{
+			board[y] = new int[n];
+			coordinates_to_feature_index[y] = new int[n];
+			for (int x = 0; x < n; x++)
+			{
+				if (y==m-1)
+				{
+					MNKAction action = new MNKAction(x,y);// { x = x , y = y };
+					available_actions.Add((IAction)action);
+				}
+				feature_index_to_board_coordinates[counter] = new int[] {x,y};
+				coordinates_to_feature_index[y][x] = counter;
+				counter ++;
+			}
+		}
+		set_feature_vector();
+	}
+	public override void make_action(int action_index)
+	{
+		MNKAction action = (MNKAction)available_actions[action_index];
+		board[action.y][action.x] = player_turn;
+		feature_vector[coordinates_to_feature_index[action.y][action.x]] = player_turn;
+
+		//Horizontal
+		if (k_line(board[action.y])) terminal = true;
+		//Vertical
+		if (!terminal)
+		{
+			var column = board
+				//.Where(o => (o != null && o.Count() > action.y))
+				.Select(o => o[action.x])
+				.ToArray();
+			if (k_line(column)) terminal = true;
+		}
+		//Diagonals
+		if (!terminal)
+		{
+			diag.Clear();
+			inv_diag.Clear(); //test speed versus declaration
+			offset = action.y - action.x;
+			for (int y = 0; y < m; y++)
+			{
+				for (int x = 0; x < n; x++)
+				{
+					if (y - x == offset) diag.Add(board[y][x]);
+					if (x + y == action.x + action.y) inv_diag.Add(board[y][x]);
+				}
+			}
+			if (k_line(diag.ToArray())) terminal = true;
+			if (!terminal) 
+			{ 
+				if (k_line(inv_diag.ToArray())) terminal = true; 
+			}
+		}
+
+		available_actions.RemoveAt(action_index);
+		
+		if (terminal) winner = player_turn;
+		else
+		{
+			height_temp = action.y - 1;
+			if (height_temp >= 0)
+			{
+				MNKAction new_action = new MNKAction(action.x,height_temp);
+				available_actions.Add((IAction)new_action);
+			}
+			if (available_actions.Count == 0) terminal = true;
+		}
+
+		player_turn = swap_player(player_turn);
+		ply++;
+	}
+	public override IGameState duplicate()
+	{
+		int[][] duplicate_board = new int[board.Length][];
+		for (int i = 0; i < board.Length; i++)
+		{
+			duplicate_board[i] = (int[])board[i].Clone();
+		}
+		List<IAction> duplicate_actions = new List<IAction>();
+		foreach (IAction action in available_actions)
+		{
+			duplicate_actions.Add(action.duplicate());
+		}
+		Dictionary<int, int> duplicate_feature_vector = new Dictionary<int, int>();
+		foreach (var feature in feature_vector)
+		{
+			duplicate_feature_vector[feature.Key] = feature.Value;
+		}
+
+		Connect4 the_duplicate = new Connect4
 		{
 			m = m,
 			n = n,

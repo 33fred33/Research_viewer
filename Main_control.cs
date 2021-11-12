@@ -13,6 +13,8 @@ public class Main_control : Control
 		[Export]
 		public int random_seed=0;
 		[Export]
+		public string game_name="mnk";
+		[Export]
 		public int board_size_m=3;
 		[Export]
 		public int board_size_n=3;
@@ -78,7 +80,7 @@ public class Main_control : Control
 
 
 		rand = new Random(random_seed);
-		start_new_game();
+		start_new_game(game_name);
 		//agents[current_state.player_turn] = new AgentMCTS(fixed_rand:rand);
 		agents[current_state.player_turn] = new AgentEPAMCTS(fixed_rand:rand);
 		agents[current_state.swap_player(current_state.player_turn)] = new AgentEPAMCTS(fixed_rand:rand);
@@ -140,7 +142,7 @@ public class Main_control : Control
 				{
 					M_lock = true;
 					GD.Print("Pressed M");
-					start_new_game();
+					start_new_game(game_name);
 				}
 
 			}
@@ -316,7 +318,8 @@ public class Main_control : Control
 		if (name=="age") return ind.age;
 		if (name=="fitness") return ind.fitness(tagent.root_node.average_reward(),tagent.root_node.visits);
 		if (name=="reward") return ind.average_reward();
-		if (name=="deviation") return ind.deviation(tagent.root_node.average_reward());
+		//if (name=="deviation") return ind.deviation(tagent.root_node.average_reward());
+		if (name=="deviation") return ind.average_immediate_deviation();
 		if (name=="visits") return ind.visits;
 		return 0;
 	}
@@ -427,12 +430,23 @@ public class Main_control : Control
 		{
 			if (!visible_node.is_root) view_node(visible_node.parent);
 		}
-	public void start_new_game()
+	public void start_new_game(string game_name)
 	{
-		IGameState state = (IGameState)new MNKGameState{m=board_size_m
-														,n=board_size_n
-														,k=line_length_k
-														,rand=rand};
+		IGameState state = (IGameState)new Connect4();
+		if (game_name == "mnk") state = (IGameState)new MNKGameState{m=board_size_m,n=board_size_n,k=line_length_k,rand=rand};
+		if (game_name == "connect4") 
+		{
+			board_size_m = 7;
+			board_size_n = 7;
+			line_length_k = 4;
+			state = (IGameState)new Connect4{m=board_size_m,n=board_size_n,k=line_length_k,rand=rand};
+		}
+		if (game_name == "othello" || game_name == "reversi") 
+		{
+			board_size_m = 8;
+			board_size_n = 8;
+			state = (IGameState)new Othello{m=board_size_m,n=board_size_n,rand=rand};
+		}
 		state.set_initial_state();
 		view_game_state(state);
 		current_state = state;

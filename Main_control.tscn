@@ -12,8 +12,10 @@ script = ExtResource( 2 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
-board_size_m = 5
-board_size_n = 5
+random_seed = 1
+game_name = "connect4"
+board_size_m = 7
+board_size_n = 7
 line_length_k = 4
 mnk_tileset = ExtResource( 1 )
 
