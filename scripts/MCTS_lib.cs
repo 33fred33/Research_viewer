@@ -223,7 +223,7 @@ public class AgentEPAMCTS : AgentMCTS
 				,int max_complexity = 5
 				,double mutation_rate = 0.3
 				,double elitism = 0.7
-				,int mutation_growth = 2
+				,int mutation_growth = 1
 				,int mutation_shrink = 2
 				,int tournament_size = 4)
 		{
@@ -296,7 +296,11 @@ public class AgentEPAMCTS : AgentMCTS
 			int action_index = available_action_indexes[selection_index];
 			duplicate_state.make_action(action_index);
 			MCTSNode new_node = node.add_child(duplicate_state, action_index);
+
+			//Genreate new patterns
 			path_node_matches(new_node, current_gen_unmatched_indexes);
+			//Dictionary<int,int> new_pattern = random_biased_pattern(node.state, new_node.state);
+
 			return new_node;
 		}
 		public double rollout_test(MCTSNode node, int sim_rollouts) //not in use, too expensive!
@@ -370,6 +374,11 @@ public class AgentEPAMCTS : AgentMCTS
 			}
 			return pattern;
 		}
+		//public Dictionary<int, int> random_biased_pattern(IGameState state, IGameState previous_state)
+		//{
+		//	Dictionary<int, int> preferred_features = idx_feature_changes(previous_state.feature_vector, state.feature_vector);
+			
+		//}
 		public Pattern create_individual(Dictionary<int, int> pattern, IGameState state)
 		{
 			Pattern ind = new Pattern(pattern, individuals_count, state);
@@ -628,6 +637,19 @@ public class AgentEPAMCTS : AgentMCTS
 		public double safe_division_zero(double num, double den)
 		{
 			return (den == 0) ? 0 : num / den;
+		}
+		public Dictionary<int,int> idx_feature_changes(Dictionary<int,int> previous_state_features, Dictionary<int,int> new_state_features)
+		{
+			return new_state_features.Except(previous_state_features).ToDictionary(x => x.Key, x => x.Value);
+		}
+		public void print_dict(Dictionary<int,int> dict)
+		{
+			string str = "F:";
+			foreach(var x in dict)
+			{
+				str = str + Convert.ToString(x.Key)+ ":"+ Convert.ToString(x.Value) + ",";
+			}
+			GD.Print(str);
 		}
 		
 }
@@ -1093,7 +1115,6 @@ public class Connect4 : MNKGameState, IGameState
 		return (IGameState)the_duplicate;
 	}
 }
-
 public class Othello : MNKGameState, IGameState
 {
 	public int height_temp;
