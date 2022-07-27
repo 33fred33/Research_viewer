@@ -58,8 +58,8 @@ public class AgentMCTS : IAgent
 				,double c = 2
 				,int rollouts = 100
 				,double win_value = 1
-				,double draw_value = 0
-				,double lose_value = -1
+				,double draw_value = 0.5
+				,double lose_value = 0
 				,string stop_condition = "iterations" //time, iterations
 				,double stop_condition_value = 500) //time in milliseconds5)
 		{
@@ -211,8 +211,8 @@ public class AgentEPAMCTS : AgentMCTS
 				,double c = 2
 				,int rollouts = 100
 				,double win_value = 1
-				,double draw_value = 0
-				,double lose_value = -1
+				,double draw_value = 0.5
+				,double lose_value = 0
 				,string stop_condition = "iterations" //time, iterations
 				,double stop_condition_value = 500 //time in milliseconds
 				//ea params
