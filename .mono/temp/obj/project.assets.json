@@ -2,13 +2,13 @@
   "version": 3,
   "targets": {
     ".NETFramework,Version=v4.7.2": {
-      "Microsoft.NETFramework.ReferenceAssemblies/1.0.0": {
+      "Microsoft.NETFramework.ReferenceAssemblies/1.0.2": {
         "type": "package",
         "dependencies": {
-          "Microsoft.NETFramework.ReferenceAssemblies.net472": "1.0.0"
+          "Microsoft.NETFramework.ReferenceAssemblies.net472": "1.0.2"
         }
       },
-      "Microsoft.NETFramework.ReferenceAssemblies.net472/1.0.0": {
+      "Microsoft.NETFramework.ReferenceAssemblies.net472/1.0.2": {
         "type": "package",
         "build": {
           "build/Microsoft.NETFramework.ReferenceAssemblies.net472.targets": {}
@@ -17,21 +17,23 @@
     }
   },
   "libraries": {
-    "Microsoft.NETFramework.ReferenceAssemblies/1.0.0": {
-      "sha512": "yPGLn8gxE8ZQhtk/ff2dYmAO3WFPXqrrKU2WzEa7AkzBy9k7Zl+EmjPTZ6zU3zCRPbHlDrxpXefhLNGFpuHung==",
+    "Microsoft.NETFramework.ReferenceAssemblies/1.0.2": {
+      "sha512": "5/cSEVld+px/CuRrbohO/djfg6++eR6zGpy88MgqloXvkj//WXWpFZyu/OpkXPN0u5m+dN/EVwLNYFUxD4h2+A==",
       "type": "package",
-      "path": "microsoft.netframework.referenceassemblies/1.0.0",
+      "path": "microsoft.netframework.referenceassemblies/1.0.2",
       "files": [
+        ".nupkg.metadata",
         ".signature.p7s",
-        "microsoft.netframework.referenceassemblies.1.0.0.nupkg.sha512",
+        "microsoft.netframework.referenceassemblies.1.0.2.nupkg.sha512",
         "microsoft.netframework.referenceassemblies.nuspec"
       ]
     },
-    "Microsoft.NETFramework.ReferenceAssemblies.net472/1.0.0": {
-      "sha512": "ygbOHfiwb+3exTcOXJ42x6yVQAwmW5K/3fXdqORUeI3hKQaOUMz6FOXzJAk8OZjJsxBFcIF+RQWWpgBZ48vtrA==",
+    "Microsoft.NETFramework.ReferenceAssemblies.net472/1.0.2": {
+      "sha512": "ryAuwkvjMC9xYQ0VXsG7ZBo62y5tBmYaCnovOL5IXfnQPQqjvJGRkLMDyUx+dnCb96UVLJv83R6XK+sRnDnaZg==",
       "type": "package",
-      "path": "microsoft.netframework.referenceassemblies.net472/1.0.0",
+      "path": "microsoft.netframework.referenceassemblies.net472/1.0.2",
       "files": [
+        ".nupkg.metadata",
         ".signature.p7s",
         "build/.NETFramework/v4.7.2/Accessibility.dll",
         "build/.NETFramework/v4.7.2/Accessibility.xml",
@@ -402,45 +404,40 @@
         "build/.NETFramework/v4.7.2/sysglobl.dll",
         "build/.NETFramework/v4.7.2/sysglobl.xml",
         "build/Microsoft.NETFramework.ReferenceAssemblies.net472.targets",
-        "microsoft.netframework.referenceassemblies.net472.1.0.0.nupkg.sha512",
+        "microsoft.netframework.referenceassemblies.net472.1.0.2.nupkg.sha512",
         "microsoft.netframework.referenceassemblies.net472.nuspec"
       ]
     }
   },
   "projectFileDependencyGroups": {
     ".NETFramework,Version=v4.7.2": [
-      "Microsoft.NETFramework.ReferenceAssemblies >= 1.0.0"
+      "Microsoft.NETFramework.ReferenceAssemblies >= 1.0.2"
     ]
   },
   "packageFolders": {
-    "C:\\Users\\fredx\\.nuget\\packages\\": {},
-    "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder": {}
+    "C:\\Users\\Fredasus\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\fredx\\Documents\\Gits\\Research_viewer\\Research_viewer.csproj",
+      "projectUniqueName": "C:\\Users\\Fredasus\\OneDrive\\Documents\\Gits\\Research_viewer\\Research_viewer.csproj",
       "projectName": "Research_viewer",
-      "projectPath": "C:\\Users\\fredx\\Documents\\Gits\\Research_viewer\\Research_viewer.csproj",
-      "packagesPath": "C:\\Users\\fredx\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\fredx\\Documents\\Gits\\Research_viewer\\.mono\\temp\\obj\\",
+      "projectPath": "C:\\Users\\Fredasus\\OneDrive\\Documents\\Gits\\Research_viewer\\Research_viewer.csproj",
+      "packagesPath": "C:\\Users\\Fredasus\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\Fredasus\\OneDrive\\Documents\\Gits\\Research_viewer\\.mono\\temp\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
-      ],
       "configFilePaths": [
-        "C:\\Users\\fredx\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "C:\\Users\\Fredasus\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net472"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net472": {
+          "targetAlias": "net472",
           "projectReferences": {}
         }
       },
@@ -452,13 +449,16 @@
     },
     "frameworks": {
       "net472": {
+        "targetAlias": "net472",
         "dependencies": {
           "Microsoft.NETFramework.ReferenceAssemblies": {
+            "suppressParent": "All",
             "target": "Package",
-            "version": "[1.0.0, )",
+            "version": "[1.0.2, )",
             "autoReferenced": true
           }
-        }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\6.0.101\\RuntimeIdentifierGraph.json"
       }
     }
   }

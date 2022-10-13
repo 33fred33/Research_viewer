@@ -205,8 +205,10 @@ public class AgentEPAMCTS : AgentMCTS
 	public int active_pop_size, pop_size, individuals_count, mutation_growth, mutation_shrink, tournament_size, max_complexity, max_initial_complexity, random_shrink, random_growth, generation;
 	public double mutation_rate, elitism;
 	public Dictionary<int,Pattern> population = new Dictionary<int, Pattern>();
-	public LinkedList<int> current_gen_unmatched_indexes = new LinkedList<int>();
+	public List<int> current_gen_unmatched_indexes = new List<int>();
 	//public LinkedList<int> current_gen_unmatched_indexes = new LinkedList<int>();
+	private List<int> expanded_node_matched_indexes = new List<int>();
+	private List<int> gene_pool = new List<int>();
 	public AgentEPAMCTS(Random fixed_rand = null
 				,double c = 2
 				,int rollouts = 100
@@ -250,8 +252,8 @@ public class AgentEPAMCTS : AgentMCTS
 		public override void fit(IGameState root_state)
 		{
 			root_node = new MCTSNode(root_state,null,true);
-			initialize_population();
-			reset_current_gen_unmatched();
+			//initialize_population();
+			//reset_current_gen_unmatched();
 		}
 		public override int predict()
 		{
@@ -271,17 +273,17 @@ public class AgentEPAMCTS : AgentMCTS
 		{
 			selected_node = selection(root_node);
 			expanded_node = expansion(selected_node);
-			cumulative_reward = rollout(expanded_node, rollouts);
+			cumulative_reward = rollout(expanded_node, rollouts); //Could return stdev if needed
 			backpropagate(expanded_node, cumulative_reward, rollouts);
-			end_generation(cumulative_reward, rollouts);
+			end_generation(cumulative_reward, rollouts, expanded_node, root_node, selected_node, expanded_node_matched_indexes);
 		}
 		public override MCTSNode selection(MCTSNode node)
 		{
-			reset_current_gen_unmatched();
+			//reset_current_gen_unmatched();
 			while (!node.is_leaf())
 			{
 				node = select_UCB(node);
-				path_node_matches(node, current_gen_unmatched_indexes);
+				//path_node_matches(node, current_gen_unmatched_indexes);
 			}
 			return node;
 		}
@@ -297,8 +299,11 @@ public class AgentEPAMCTS : AgentMCTS
 			duplicate_state.make_action(action_index);
 			MCTSNode new_node = node.add_child(duplicate_state, action_index);
 
+			expanded_node_matched_indexes.Clear();
+			List<int> pop_indexes = new List<int>(this.population.Keys);
+			expanded_node_matched_indexes = state_matches(duplicate_state, pop_indexes);
 			//Genreate new patterns
-			path_node_matches(new_node, current_gen_unmatched_indexes);
+			//path_node_matches(new_node, current_gen_unmatched_indexes);
 			//Dictionary<int,int> new_pattern = random_biased_pattern(node.state, new_node.state);
 
 			return new_node;
@@ -316,12 +321,12 @@ public class AgentEPAMCTS : AgentMCTS
 			{
 				state = node.state.duplicate();
 				current_rollout_matches.Clear();
-				LinkedList<int> current_rollout_unmatched_indexes = new LinkedList<int>(current_gen_unmatched_indexes);
+				List<int> current_rollout_unmatched_indexes = new List<int>(current_gen_unmatched_indexes);
 				while (!state.terminal)
 				{
 					state.make_random_action();
-					matches = state_matches(state, current_rollout_unmatched_indexes);
-					current_rollout_matches.AddRange(matches);
+					//matches = state_matches(state, current_rollout_unmatched_indexes);
+					//current_rollout_matches.AddRange(matches);
 					foreach (int pattern_idx in matches)
 					{
 						current_rollout_unmatched_indexes.Remove(pattern_idx);
@@ -346,11 +351,12 @@ public class AgentEPAMCTS : AgentMCTS
 			{
 				node.parent.update_reward(sign_multiplier(node.parent)*average_reward);
 				deviation = sign_multiplier(node)*node.average_reward() - sign_multiplier(node.parent)*node.parent.average_reward();
-				update_reward_matched_individuals(node.current_gen_matching_indexes, average_reward);
-				update_immediate_deviation_matched_individuals(node.current_gen_matching_indexes, deviation);
-				update_node_prior(node);
 
-				node.current_gen_matching_indexes.Clear();
+				//update_reward_matched_individuals(node.current_gen_matching_indexes, average_reward);
+				//update_immediate_deviation_matched_individuals(node.current_gen_matching_indexes, deviation);
+				//update_node_prior(node);
+
+				//node.current_gen_matching_indexes.Clear();
 				node = node.parent;
 			}
 		}
@@ -374,16 +380,15 @@ public class AgentEPAMCTS : AgentMCTS
 			}
 			return pattern;
 		}
-		//public Dictionary<int, int> random_biased_pattern(IGameState state, IGameState previous_state)
-		//{
-		//	Dictionary<int, int> preferred_features = idx_feature_changes(previous_state.feature_vector, state.feature_vector);
-			
-		//}
 		public Pattern create_individual(Dictionary<int, int> pattern, IGameState state)
 		{
 			Pattern ind = new Pattern(pattern, individuals_count, state);
 			individuals_count++;
 			return ind;
+		}
+		public void add_individual_to_population(Pattern ind)
+		{
+			population[ind.index] = ind;
 		}
 		public Dictionary<int,Pattern> random_state_population(MCTSNode node)
 		{
@@ -394,7 +399,7 @@ public class AgentEPAMCTS : AgentMCTS
 			{
 				var state_tuple = state.get_random_future_state();
 				Pattern ind = create_individual(random_uniform_pattern(state_tuple.random_state), state_tuple.random_state);
-				population[ind.index] = ind; 
+				add_individual_to_population(ind);
 				collective_reward += result_to_reward(state_tuple.final_state);
 			}
 			//to avoid having uneven rewards given different amount of rollouts
@@ -423,28 +428,6 @@ public class AgentEPAMCTS : AgentMCTS
 		{
 			population = root_state_population(root_node);
 		}
-		public bool pattern_match(Dictionary<int,int> pattern, IGameState state)
-		{
-			foreach (var feature in pattern)
-			{
-				if (feature.Value != state.feature_vector[feature.Key])
-				{
-					return false;
-				}
-			}
-			return true;
-		}
-		public List<int> state_matches(IGameState state, LinkedList<int> indexes)
-		{
-			List<int> matches = new List<int>();
-			foreach (var idx in indexes)
-			{
-				if (pattern_match(population[idx].pattern, state)){
-					matches.Add(idx);
-				}
-			}
-			return matches;
-		}
 		public override double exploitation_value(MCTSNode node)
 		{
 			//GD.Print("node.prior", node.prior_reward, " ", node.prior_visits); 
@@ -454,15 +437,59 @@ public class AgentEPAMCTS : AgentMCTS
 		}
 		public void reset_current_gen_unmatched()
 		{
-			current_gen_unmatched_indexes.Clear();
-			foreach(int key in population.Keys)
-			{
-				//current_gen_unmatched_indexes.Add(key);
-				current_gen_unmatched_indexes.AddLast(key);
-			}
+			current_gen_unmatched_indexes = new List<int>(population.Keys);
 		}
-		public void end_generation(double current_gen_reward, int sim_rollouts)
+		public void end_generation(double current_gen_reward, int sim_rollouts, MCTSNode expanded_node, MCTSNode root_node, MCTSNode selected_node, List<int> matched_indexes)
 		{
+			//Calc variables
+			double averaged_reward = current_gen_reward/sim_rollouts;
+			double reward_deviation = averaged_reward - root_node.average_reward();
+			double update_immediate_deviation = averaged_reward - selected_node.average_reward();
+			Dictionary<int, int> focused_features = idx_feature_changes(selected_node.state.feature_vector, expanded_node.state.feature_vector);
+			List<int> gene_pool_indexes = get_gene_pool_indexes(matched_indexes);
+
+			//Generate rooted offsprings
+			foreach(KeyValuePair<int, int> root_gene in focused_features) //Randomization is needed if not every feature is used
+			{
+				
+				Dictionary<int,int> offspring_pattern = new Dictionary<int, int>();
+				offspring_pattern[root_gene.Key] = root_gene.Value;
+				Pattern offspring = create_individual(offspring_pattern,expanded_node.state);
+				Dictionary <int, Pattern> matched_population = new Dictionary<int, Pattern>();
+				foreach (int idx in matched_indexes) {matched_population[idx] = population[idx];}
+				
+				//Specialization
+				(bool matched, Pattern matched_individual) = is_duplicated(offspring, matched_population);
+				List<int> temporal_gene_pool_indexes = new List<int>(gene_pool_indexes);
+				while(matched)
+				{
+					int new_gene_idx = rand.Next(temporal_gene_pool_indexes.Count);
+					int index_to_add = temporal_gene_pool_indexes.ElementAt(new_gene_idx);
+					
+					offspring.pattern[index_to_add] = expanded_node.state.feature_vector[index_to_add];
+					(matched, matched_individual) = is_duplicated(offspring, matched_population);
+
+					temporal_gene_pool_indexes.RemoveAt(new_gene_idx);
+					if (temporal_gene_pool_indexes.Count==0){break;}
+				}
+				if (!matched) 
+				{
+					add_individual_to_population(offspring);
+					matched_indexes.Append(offspring.index);
+				}
+				//foreach (int idx_idx in Enumerable.Range(0, matched_indexes.Count()))
+			}
+			
+			
+
+			//Dictionary<int, int> gene_pool = new Dictionary<int, int>(focused_features); //BUG PRODUCER: requires deep copy if the dictionary types are changed
+			//gene_pool[1] = 2;
+			//dict1.ToList().ForEach(x => dict2[x.Key] = x.Value));
+			//add_individual_to_population(create_individual(focused_features,expanded_node.state));
+			/*
+			Dictionary<int,Pattern> offsprings = generate_offsprings(, );
+
+
 			Dictionary<int,Pattern> new_pop = new Dictionary<int, Pattern>();
 			Pattern tind;
 			List<int> ind_idx = population.Keys.ToList();
@@ -511,8 +538,14 @@ public class AgentEPAMCTS : AgentMCTS
 			population = new_pop;
 
 			//remove deleted individual's indexes from the nodes?
+			*/
+			
 		}
-		public void path_node_matches(MCTSNode node, LinkedList<int> population_indexes)
+		public int n_offsprings(Dictionary<int,Pattern> pop, float reward_deviation)
+		{
+			return 5;
+		}
+		public void path_node_matches(MCTSNode node, List<int> population_indexes)
 		{
 			//If a node doesnt get an ind as prio, none of its siblings did either
 			List<int> matches = state_matches(node.state, population_indexes);
@@ -641,6 +674,59 @@ public class AgentEPAMCTS : AgentMCTS
 		public Dictionary<int,int> idx_feature_changes(Dictionary<int,int> previous_state_features, Dictionary<int,int> new_state_features)
 		{
 			return new_state_features.Except(previous_state_features).ToDictionary(x => x.Key, x => x.Value);
+		}
+		public bool pattern_match(Dictionary<int,int> pattern, IGameState state)
+		{
+			foreach (var feature in pattern)
+			{
+				if (feature.Value != state.feature_vector[feature.Key])
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+		public List<int> state_matches(IGameState state, List<int> indexes)
+		{
+			List<int> matches = new List<int>();
+			foreach (var idx in indexes)
+			{
+				if (pattern_match(population[idx].pattern, state)){
+					matches.Add(idx);
+				}
+			}
+			return matches;
+		}
+		public Dictionary<int,int> specialize_pattern(Dictionary<int,int> pattern, List<int> individual_indexes)
+		{
+			int idx = individual_indexes[rand.Next(individual_indexes.Count)];
+			Dictionary<int,int> merge_pattern = population[idx].pattern;
+			int index_to_add = merge_pattern.Keys.ElementAt(rand.Next(merge_pattern.Count));
+			pattern[index_to_add] = merge_pattern[index_to_add]; //POTENTIAL BUG SOURCE. SHALLOW COPY OF THE ELEMENT
+			return pattern;
+		}
+		public List<int> get_gene_pool_indexes(List<int> population_indexes)
+		{
+			List<int> all_feature_indexes = new List<int>();
+			foreach(int idx in population_indexes)
+			{
+				List<int> feature_indexes = new List<int>(population[idx].pattern.Keys);
+				all_feature_indexes.AddRange(feature_indexes);
+			}
+			return all_feature_indexes.Distinct().ToList();
+		}
+		public List<int> duplicated_indexes(List<int> population_indexes) //Not ready
+		{
+			List<int> matched_indexes = new List<int>();
+			Dictionary <int, Pattern> untested_population = new Dictionary<int, Pattern>();
+			foreach (int idx in population_indexes) {untested_population[idx] = population[idx];}
+
+			foreach(int ind in population_indexes)
+			{
+				untested_population.Remove(ind);
+				(bool matched, Pattern matched_individual) = is_duplicated(population[ind], untested_population);
+			}
+			return matched_indexes;
 		}
 		public void print_dict(Dictionary<int,int> dict)
 		{

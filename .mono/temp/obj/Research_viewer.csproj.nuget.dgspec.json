@@ -1,0 +1,53 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\Fredasus\\OneDrive\\Documents\\Gits\\Research_viewer\\Research_viewer.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\Fredasus\\OneDrive\\Documents\\Gits\\Research_viewer\\Research_viewer.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\Fredasus\\OneDrive\\Documents\\Gits\\Research_viewer\\Research_viewer.csproj",
+        "projectName": "Research_viewer",
+        "projectPath": "C:\\Users\\Fredasus\\OneDrive\\Documents\\Gits\\Research_viewer\\Research_viewer.csproj",
+        "packagesPath": "C:\\Users\\Fredasus\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Fredasus\\OneDrive\\Documents\\Gits\\Research_viewer\\.mono\\temp\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Fredasus\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "targetAlias": "net472",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net472": {
+          "targetAlias": "net472",
+          "dependencies": {
+            "Microsoft.NETFramework.ReferenceAssemblies": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.2, )",
+              "autoReferenced": true
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\6.0.101\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
